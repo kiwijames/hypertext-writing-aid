@@ -1,19 +1,28 @@
 const { app, BrowserWindow, webContents, ipcMain, dialog, Menu } = require('electron')
 const fs = require('fs')
 const sqlite3 = require('sqlite3').verbose();
-// Most this code comes directly from https://electronjs.org/docs/tutorial/first-app
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 
+const app_path = app.getAppPath()
 const db = initDatabase('','mydatabase.sqlite')
-let win
-//excluding the editor/main window
-let windowList = []
+let windowPDFList = []
+let editorWindow  
 
+
+////////////////////////////creating functions////////////////////////////////////////
+
+
+/**
+ * Creates and returns a window,
+ * loading a given HTML file.
+ * @param  {String} HTMLFilePath Absolute path to a PDF file.
+ * @return {BrowserWindow} Window with the PDF in a Viewer.
+ */
 function createHTMLWindow (HTMLFilePath) {
   // Create the browser window.
-  win = new BrowserWindow({ 
+  let win = new BrowserWindow({ 
   width: 630, 
   minWidth:630,
   maxWidth:630,
@@ -34,34 +43,39 @@ function createHTMLWindow (HTMLFilePath) {
   return win
 }
 
+/**
+ * Creates and returns a window,
+ * loading a given PDF into a template.
+ * @param  {String} pdfFilePath Absolute path to a PDF file.
+ * @return {BrowserWindow} Window with the PDF in a Viewer.
+ */
 function createPDFWindow(pdfFilePath) {
-  win = new BrowserWindow({ 
-	width: 800, 
-	height: 600 ,
-	webPreferences: {
-	  nodeIntegration:true
-}})
-win.setMenuBarVisibility(false)
-  // and load the index.html of the app.
+    win = new BrowserWindow({ 
+    width: 800, 
+    height: 600 ,
+    webPreferences: {
+      nodeIntegration:true
+  }});
+  win.setMenuBarVisibility(false)
   win.loadFile('public/template.html')
   let contents = win.webContents
   contents.on('dom-ready', () => {
     console.log('send pdfFile message: '+pdfFilePath)
     contents.send('pdfFile', pdfFilePath)
   })
-  // Open the DevTools.
- // contents.openDevTools()
-  // Emitted when the window is closed.
-  win.on('closed', () => {
-    // Dereference the window object, usually you would store windows
-    // in an array if your app supports multi windows, this is the time
-    // when you should delete the corresponding element.
+  // Uncomment DevTools for debugging
+  // contents.openDevTools()
+  win.on('close', () => {
+    // Dereference the window object from list
+    console.log("Removing Window with ID "+win.id)
+    windowPDFList = windowPDFList.filter(w => w.id != win.id)
     win = null
   })
   return win
 }
 
-var menu = Menu.buildFromTemplate([
+// Menu template for the main window
+const menu = Menu.buildFromTemplate([
   {
       label: 'File',
       submenu: [
@@ -76,7 +90,7 @@ var menu = Menu.buildFromTemplate([
                 { name: "All Files", extensions: ["*"] }
               ]
             })
-            if(filePaths) filePaths.forEach( (path) => { windowList.push(createPDFWindow(path)) })
+            if(filePaths) filePaths.forEach( (path) => { windowPDFList.push(createPDFWindow(path)) })
           }
       }, 
       {
@@ -120,20 +134,12 @@ var menu = Menu.buildFromTemplate([
     ]
   }
 ]);
+//Set Menu for all windows
 Menu.setApplicationMenu(menu);
 
+////////////////////////////event handeling////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.on('ready', () => {
-    //window1 = createPDFWindow('Bush – As we may think.pdf')
-    //window2 = createPDFWindow('Bush – As we may think.pdf')
     editorWindow = createHTMLWindow('public/editor.html')
 })
 
@@ -147,9 +153,11 @@ app.on('window-all-closed', () => {
   }
 })
 
+////////////////////////////message handeling////////////////////////////////////////
+
 ipcMain.on('linking-action', (event, arg) => {
   console.log("linking action to be performed");
-  windowList.map(window => {
+  windowPDFList.map(window => {
     window.webContents.send('linking-message') //start linking next marked texts
   })
 });
@@ -211,6 +219,8 @@ ipcMain.on('deleteLink', (event, arg) => {
   deleteLinkEntryById(arg)
 });
 
+////////////////////////////database functions////////////////////////////////////////
+
 function deleteLinkEntryById(link_id){
   let deleteStatement = "DELETE FROM links WHERE link_id="+link_id;
   let db = new sqlite3.Database('mydatabase.sqlite')
@@ -220,8 +230,8 @@ function deleteLinkEntryById(link_id){
       console.error(err)
     } else console.log("deleted link with id"+link_id)
   });
-  
 }
+
 function initDatabase(path, databaseName){
   //Creating a table automatically includes ROWID
   //document_name_X is the name of the document in which the link was set
