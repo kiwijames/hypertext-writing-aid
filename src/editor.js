@@ -10,16 +10,16 @@ ipcRenderer.on('link1', (event, data) => {
     console.log("received message "+data)
     docName1 = data.pdfName
     docData1 = data
-    document.getElementById('document-1-data').value = data.text
-    document.getElementById('document-1-name').value = data.pdfName
+    //document.getElementById('document-1-data').value = data.text
+    //document.getElementById('document-1-name').value = data.pdfName
 });
 
 ipcRenderer.on('link2', (event, data) => {
     console.log("received message "+data)
     docName2 = data.pdfName
     docData2 = data
-    document.getElementById('document-2-data').value = data.text
-    document.getElementById('document-2-name').value = data.pdfName
+    //document.getElementById('document-2-data').value = data.text
+    //document.getElementById('document-2-name').value = data.pdfName
 });
 
 /*ipcRenderer.on('table-data', (event, data) => {
@@ -52,36 +52,10 @@ ipcRenderer.on('loadText', (event, data) => {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
-    let cancelButton = document.getElementById('cancelLink');
-    let saveButton = document.getElementById('saveLink');
-    let linkNameString = document.getElementById('link-name');
+    //let linkNameString = document.getElementById('link-name');
     let addLocalLinkButton = document.getElementById('addLocalLink');
 
-    //Remove all content of the fields
-    cancelButton.onclick = function(){
-        document.getElementById('document-1-data').value = ""
-        document.getElementById('document-1-name').value = ""
-        document.getElementById('document-2-data').value = ""
-        document.getElementById('document-2-name').value = ""
-        document.getElementById('link-name').value= ""
-        docName2=""
-        docName1=""
-    }
 
-    //save link if all fields filled
-    saveButton.onclick = function(){
-        console.log(linkNameString.value)
-        if(linkNameString.value.length>0){//} && docName1.length>0 && docName2.length>0){
-            data = {
-                linkName: linkNameString.value,
-                docData1: docData1,
-                docData2: docData2,
-                docName1: docName1,
-                docName2: docName2
-            }
-            ipcRenderer.send('save-link', data);
-        }
-    }
 
     addLocalLinkButton.onclick = function(){
         let textBox = document.getElementById('textBox')
@@ -97,9 +71,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log("message sent, waiting?")
             
             ipcRenderer.on('returnLinkId', (event, data) => {
-                newTextElement.setAttribute('href',data)
+                linkingFunction = "callLinkedLinks("+data+");"
+                newTextElement.setAttribute('href',"#")
+                newTextElement.setAttribute('onclick',linkingFunction)
+                
                 console.log("end!")
-                console.log(data)
+                console.log(linkingFunction)
                 if (selectedText.rangeCount) {
                     let range = selectedText.getRangeAt(0);
                     range.deleteContents();
@@ -108,4 +85,35 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }      
     }
+
+    // Aktuell: jeder link click führt den onclick event durch, könnte aber deaktiviert werden
+    // mit hover + strg wie ein link aussehen lassen, sonst keine funktion haben
+    // window.addEventListener("keydown", function(event) {
+    //     // Bind to both command (for Mac) and control (for Win/Linux)
+    //     if (event.ctrlKey) {
+    //         anchorList = document.getElementsByTagName('a')
+    //         console.log("content false")
+    //         anchorList.array.foreach(anchor => {
+    //             console.log("false")
+    //             anchor.setAttribute('contenteditable','false')
+    //         })
+    //     }
+    // }, false);
+    // window.addEventListener("keyup", function(event) {
+    //     // Bind to both command (for Mac) and control (for Win/Linux)
+    //     if (event.ctrlKey) {
+    //         anchorList = document.getElementsByTagName('a')
+    //         console.log("content true")
+    //         anchorList.array.foreach(anchor => {
+    //             console.log("true")
+    //             anchor.setAttribute('contenteditable','true')
+    //         })
+    //     }
+    // }, false);
 })
+
+
+function callLinkedLinks(linkID){
+    ipcRenderer.send('call-linked-links',linkID);
+}
+

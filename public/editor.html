@@ -154,23 +154,17 @@ img.intLink { border: 0; }
   <p>Lorem ipsum dolor sit amet</p>
 </div>
 <!--</form>-->
-<hr>
-<button onclick="createDocumentLink()">Link Documents</button> 
-<button onclick="" id="saveLink">Save under:</button> <input type="text" id="link-name">
-<button onclick="" id="cancelLink">Cancel</button> 
-<br>
-<label>Document 1:</label> <input type="text" id="document-1-name"><br>
-<label>Data:</label> <input type="text" id="document-1-data"><br>
-<label>Document 2:</label> <input type="text" id="document-2-name"><br>
-<label>Data:</label> <input type="text" id="document-2-data">
 <script>
 require('../src/editor.js');
 function createDocumentLink(){
   const { ipcRenderer } = require('electron');
   let data = "link clicked"
-  ipcRenderer.send('linking-action', data);
+  ipcRenderer.send('linking-action', data); 
 }
-
+function callLinkedLinks(linkID){
+  const { ipcRenderer } = require('electron');
+  ipcRenderer.send('call-linked-links',linkID);
+}
 </script>
 </body>
 </html>

@@ -5,8 +5,10 @@ const sqlite3 = require('sqlite3').verbose();
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 
+
 const app_path = app.getAppPath()
-const db = initDatabase('','mydatabase.sqlite')
+//not working because asynchronous
+const db = initDatabase('', 'mydatabase.sqlite')
 let windowPDFList = []
 let editorWindow  
 
@@ -30,6 +32,7 @@ function createHTMLWindow (HTMLFilePath) {
 	webPreferences: {
 	nodeIntegration:true
 }})
+  win.setMenu(menu)
   // and load the index.html of the app.
   win.loadFile(HTMLFilePath)
   win.webContents.openDevTools()
@@ -47,24 +50,27 @@ function createHTMLWindow (HTMLFilePath) {
  * Creates and returns a window,
  * loading a given PDF into a template.
  * @param  {String} pdfFilePath Absolute path to a PDF file.
+ * @param  {Number} pageNumber On which page to open the file.
  * @return {BrowserWindow} Window with the PDF in a Viewer.
  */
-function createPDFWindow(pdfFilePath) {
+function createPDFWindow(pdfFilePath, pageNumber=1, quads) {
     win = new BrowserWindow({ 
     width: 800, 
     height: 600 ,
     webPreferences: {
-      nodeIntegration:true
+      nodeIntegration:true,
+      webSecurity: false
   }});
-  win.setMenuBarVisibility(false)
+  win.setMenu(menuPDF)
+  //win.setMenuBarVisibility(false)
   win.loadFile('public/template.html')
   let contents = win.webContents
   contents.on('dom-ready', () => {
     console.log('send pdfFile message: '+pdfFilePath)
-    contents.send('pdfFile', pdfFilePath)
+    contents.send('pdfFile', pdfFilePath, pageNumber, quads)
   })
   // Uncomment DevTools for debugging
-  // contents.openDevTools()
+  contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object from list
     console.log("Removing Window with ID "+win.id)
@@ -94,8 +100,8 @@ const menu = Menu.buildFromTemplate([
           }
       }, 
       {
-        label: 'Load Text',
-        accelerator: "CmdOrCtrl+l",
+        label: 'Import Text',
+        accelerator: "CmdOrCtrl+i",
         click: function() {
           path = dialog.showOpenDialog({ 
             properties: ['openFile'] ,
@@ -134,12 +140,60 @@ const menu = Menu.buildFromTemplate([
     ]
   }
 ]);
-//Set Menu for all windows
+// pdf menu
+const menuPDF = Menu.buildFromTemplate([
+  {
+    label: 'File',
+    submenu: [
+      {
+        label: 'Link selection',
+        accelerator: "CmdOrCtrl+l",
+        click: function(menuItem, currentWindow) {
+          data = {
+            toast: true
+          }
+          currentWindow.webContents.send('linking-message',data)
+          windowPDFList.map(window => {
+            if(window.id!=currentWindow.id)
+              window.webContents.send('linking-message') //start linking next marked texts
+          })
+        }
+      }
+    ]
+  }
+]);
+
+//Set Menu for all windows, since mac doesnt allow individual window menus
 Menu.setApplicationMenu(menu);
+
+
+////////////////////////////link linking handeling////////////////////////////////////////
+  // create 2 documents 50/50 next to each other
+function linklink(pdfPath1,pdfPath2,pageNumber1=1,pageNumber2=1,quads1,quads2){
+  height = 732
+  width = 1366
+  let pdf1 = pdfPath1
+  let pdf2 = pdfPath2
+  let win1 = createPDFWindow(pdf1,pageNumber1,quads1)
+  let win2 = createPDFWindow(pdf2,pageNumber2,quads2)
+  win1.setSize(width/2,height)
+  win2.setSize(width/2,height)
+  win1.setPosition(0,0)
+  win2.setPosition(width/2,0)
+  windowPDFList.push(win1)
+  windowPDFList.push(win2)
+
+}
+
 
 ////////////////////////////event handeling////////////////////////////////////////
 
 app.on('ready', () => {
+    // How to get screen globally?
+    // const {screen} = require('electron')
+    // const { width, height } = screen.getPrimaryDisplay().workAreaSize
+    // console.log("wdith "+width)
+    // console.log("height "+height)
     editorWindow = createHTMLWindow('public/editor.html')
 })
 
@@ -155,21 +209,57 @@ app.on('window-all-closed', () => {
 
 ////////////////////////////message handeling////////////////////////////////////////
 
-ipcMain.on('linking-action', (event, arg) => {
-  console.log("linking action to be performed");
-  windowPDFList.map(window => {
-    window.webContents.send('linking-message') //start linking next marked texts
-  })
-});
+// ipcMain.on('linking-action', (event, arg) => {
+//   console.log("linking action to be performed");
+//   windowPDFList.map(window => {
+//     window.webContents.send('linking-message') //start linking next marked texts
+//   })
+//});
 
 let linkingCounter = 0
+let linkData = {
+  linkName: "default-main",
+  docName1: "",
+  docName2: "",
+  pageNumber1: 0,
+  pageNumber2: 0,
+  pageSelection1: "",
+  pageSelection2: ""
+}
 ipcMain.on('linking-answer', (event, arg) => {
+  //arg looks like this:
+  // data = {
+  //   text : docViewer.getSelectedText(),
+  //   windowId : remote.getCurrentWindow().id,
+  //   pdfName : pdfFileName,
+  //   pageNumber: docViewer.getCurrentPage(),
+  //   quads: allQuads
+  // }
   console.log("link counter: "+linkingCounter)
   if(linkingCounter==0){
-    editorWindow.webContents.send('link1',arg)
+    console.log("arg.pdfname: "+arg.pdfName)
+    linkData.docName1 = arg.pdfName
+    linkData.pageNumber1 = arg.pageNumber
+    quadString = JSON.stringify(arg.quads) //.reduce((accumulator, quad) =>{accumulator + quad})
+    console.log("quadString: "+quadString)
+    linkData.pageSelection1 = quadString
+    editorWindow.webContents.send('link1',arg) //second link
+    data = {
+      toast: true
+    }
+    event.sender.send('link1', data)
     linkingCounter++
   }else if (linkingCounter==1) {
-    editorWindow.webContents.send('link2',arg)
+    linkData.docName2 = arg.pdfName
+    linkData.pageNumber2 = arg.pageNumber
+    quadString = JSON.stringify(arg.quads) //.reduce((accumulator, quad) =>{accumulator + quad})
+    console.log("quadString2: "+quadString)
+    linkData.pageSelection2 = quadString
+    editorWindow.webContents.send('link2',arg) //linking over
+    data = {
+      toast: true
+    }
+    event.sender.send('link2', data)
     linkingCounter++
   }
   if (linkingCounter==2) {
@@ -180,10 +270,11 @@ ipcMain.on('linking-answer', (event, arg) => {
 });
 
 ipcMain.on('save-link', (event, data) => {
+  linkData.linkName = data.linkName
   console.log("save-link called")
   let insertStatement = "INSERT INTO links(link_name,document_name_1,\
-                          document_data_1,document_name_2,document_data_2) \
-                          VALUES('"+data.linkName+"','"+data.docName1+"','bla','"+data.docName2+"','blabla')"
+                          document_data_1,document_quads_1,document_name_2,document_data_2,document_quads_2) \
+                          VALUES('"+linkData.linkName+"','"+linkData.docName1+"','"+linkData.pageNumber1+"','"+linkData.pageSelection1+"','"+linkData.docName2+"','"+linkData.pageNumber2+"','"+linkData.pageSelection2+"')"
   
   let db = new sqlite3.Database('mydatabase.sqlite')
   console.log("db: "+db)
@@ -219,9 +310,51 @@ ipcMain.on('deleteLink', (event, arg) => {
   deleteLinkEntryById(arg)
 });
 
-////////////////////////////database functions////////////////////////////////////////
+ipcMain.on('call-linked-links', (event, arg) => {
+  //arg = link_id
+  console.log(arg)
+  let {path1, path2} = getPathsFromLinkId(arg)
+  console.log(path1)
+  console.log(path2)
+  //linklink(path1,path2)
+});
 
-function deleteLinkEntryById(link_id){
+
+////////////////////////////database functions////////////////////////////////////////
+function getPathsFromLinkId(link_id, callback){
+  let selectStatement = "SELECT * links WHERE link_id="+link_id;
+  let db = new sqlite3.Database('mydatabase.sqlite')
+  var path1
+  var path2
+  db.all("SELECT * FROM links WHERE link_id="+link_id+";", function(err,rows){//WHERE link_id="+link_id
+    //let rowText ="link_id | link_name | name1 | data1 | name2 | data2\n"
+    rows.forEach((row) => {
+      console.log("row: "+rows)
+      console.log("element: "+rows[0])
+      console.log("element: "+rows[0].link_name)
+      path1 = rows[0].document_name_1
+      path2 = rows[0].document_name_2
+      pageNumber1 = rows[0].document_data_1
+      pageNumber2 = rows[0].document_data_2
+      quadsString1 = rows[0].document_quads_1
+      quadsString2 = rows[0].document_quads_2
+      console.log(quadsString1)
+      console.log(quadsString2)
+      quads1 = JSON.parse(quadsString1)
+      quads2 = JSON.parse(quadsString2)
+      //path1 = row.document_name_1
+      //path2 = row.document_name_2
+      linklink(path1,path2,pageNumber1,pageNumber2,quads1,quads2)
+    })
+  })
+  console.log("path1 in sqlfunction: "+path1)
+  console.log("path2 in sqlfunction: "+path2)
+  return {path1,path2}
+}
+
+
+
+function deleteLinkEntryById(link_id) {
   let deleteStatement = "DELETE FROM links WHERE link_id="+link_id;
   let db = new sqlite3.Database('mydatabase.sqlite')
   db.run(deleteStatement, function(err){
@@ -241,8 +374,10 @@ function initDatabase(path, databaseName){
     link_name TEXT,\
     document_name_1 TEXT NOT NULL,\
     document_data_1 TEXT NOT NULL,\
+    document_quads_1 TEXT NOT NULL,\
     document_name_2 TEXT NOT NULL,\
     document_data_2 TEXT NOT NULL,\
+    document_quads_2 TEXT NOT NULL,\
     creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\
     );'
   
