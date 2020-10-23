@@ -1,5 +1,6 @@
 const { app, BrowserWindow, webContents, ipcMain, dialog, Menu } = require('electron')
 const fs = require('fs')
+const pfd = require('path');
 const sqlite3 = require('sqlite3').verbose();
 
 // Keep a global reference of the window object, if you don't, the window will
@@ -7,8 +8,8 @@ const sqlite3 = require('sqlite3').verbose();
 
 
 const app_path = app.getAppPath()
-//not working because asynchronous
-const db = initDatabase('', 'mydatabase.sqlite')
+const dbFileName = 'mydatabase.sqlite'
+const db = initDatabase('', dbFileName)
 let windowPDFList = []
 let editorWindow  
 
@@ -32,11 +33,8 @@ function createHTMLWindow (HTMLFilePath) {
 	webPreferences: {
 	nodeIntegration:true
 }})
-  win.setMenu(menu)
-  // and load the index.html of the app.
   win.loadFile(HTMLFilePath)
-  win.webContents.openDevTools()
-  // Emitted when the window is closed.
+  // win.webContents.openDevTools()
   win.on('closed', () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
@@ -66,17 +64,20 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads) {
   win.loadFile('public/template.html')
   let contents = win.webContents
   contents.on('dom-ready', () => {
-    console.log('send pdfFile message: '+pdfFilePath)
+    console.debug('send pdfFile message: '+pdfFilePath)
     contents.send('pdfFile', pdfFilePath, pageNumber, quads)
   })
   // Uncomment DevTools for debugging
-  contents.openDevTools()
+  //contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object from list
-    console.log("Removing Window with ID "+win.id)
+    console.debug("Removing Window with ID "+win.id)
+    console.debug("Window list before "+windowPDFList)
     windowPDFList = windowPDFList.filter(w => w.id != win.id)
+    console.debug("Window list now "+windowPDFList)
     win = null
   })
+  windowPDFList.push(win)
   return win
 }
 
@@ -96,7 +97,7 @@ const menu = Menu.buildFromTemplate([
                 { name: "All Files", extensions: ["*"] }
               ]
             })
-            if(filePaths) filePaths.forEach( (path) => { windowPDFList.push(createPDFWindow(path)) })
+            if(filePaths) filePaths.forEach( (path) => { createPDFWindow(path); })
           }
       }, 
       {
@@ -168,32 +169,32 @@ Menu.setApplicationMenu(menu);
 
 
 ////////////////////////////link linking handeling////////////////////////////////////////
-  // create 2 documents 50/50 next to each other
+
+/**
+ * Creates 2 windows of pdf documents next to each other.
+ * @param  {String} pdfPath1 Absolute path to a PDF file.
+ * @param  {String} pdfPath2 Absolute path to a PDF file.
+ * @param  {Number} pageNumber1 On which page to open the file.
+ * @param  {Number} pageNumber2 On which page to open the file.
+ * @param  {Object} quads1 PDFtron values of linked elements.
+ * @param  {Object} quads1 PDFtron values of linked elements.
+ */
 function linklink(pdfPath1,pdfPath2,pageNumber1=1,pageNumber2=1,quads1,quads2){
-  height = 732
-  width = 1366
-  let pdf1 = pdfPath1
-  let pdf2 = pdfPath2
-  let win1 = createPDFWindow(pdf1,pageNumber1,quads1)
-  let win2 = createPDFWindow(pdf2,pageNumber2,quads2)
+  const {screen} = require('electron')
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+
+  let win1 = createPDFWindow(pdfPath1,pageNumber1,quads1)
+  let win2 = createPDFWindow(pdfPath2,pageNumber2,quads2)
   win1.setSize(width/2,height)
   win2.setSize(width/2,height)
   win1.setPosition(0,0)
   win2.setPosition(width/2,0)
-  windowPDFList.push(win1)
-  windowPDFList.push(win2)
-
 }
 
+////////////////////////////app event handeling////////////////////////////////////////
 
-////////////////////////////event handeling////////////////////////////////////////
-
+// Create main window when ready
 app.on('ready', () => {
-    // How to get screen globally?
-    // const {screen} = require('electron')
-    // const { width, height } = screen.getPrimaryDisplay().workAreaSize
-    // console.log("wdith "+width)
-    // console.log("height "+height)
     editorWindow = createHTMLWindow('public/editor.html')
 })
 
@@ -209,16 +210,9 @@ app.on('window-all-closed', () => {
 
 ////////////////////////////message handeling////////////////////////////////////////
 
-// ipcMain.on('linking-action', (event, arg) => {
-//   console.log("linking action to be performed");
-//   windowPDFList.map(window => {
-//     window.webContents.send('linking-message') //start linking next marked texts
-//   })
-//});
-
 let linkingCounter = 0
 let linkData = {
-  linkName: "default-main",
+  linkName: "default",
   docName1: "",
   docName2: "",
   pageNumber1: 0,
@@ -226,6 +220,7 @@ let linkData = {
   pageSelection1: "",
   pageSelection2: ""
 }
+
 ipcMain.on('linking-answer', (event, arg) => {
   //arg looks like this:
   // data = {
@@ -366,6 +361,7 @@ function deleteLinkEntryById(link_id) {
 }
 
 function initDatabase(path, databaseName){
+  let fullFilePath = pfd.join(path, databaseName)
   //Creating a table automatically includes ROWID
   //document_name_X is the name of the document in which the link was set
   //document_data includes the text, as well as the quads and page_number
@@ -382,22 +378,18 @@ function initDatabase(path, databaseName){
     );'
   
   //TODO: document mapping for name-changes
-  //DocumentNameMappingTable = 'CREATE TABLE documents (\
-  //  document_id INTEGER PRIMARY KEY AUTOINCREMENT\
-  //  document_name TEXT NOT NULL\
-  //  \
-  //  );'
 
-  fs.access(path, fs.F_OK, (err) => {
+  fs.access(fullFilePath, fs.F_OK, (err) => {
     if (err) {
       console.log(err)
       console.log("Datbase not found.")
       console.log("Datbase will be initiated found.")
       let db = new sqlite3.Database('mydatabase.sqlite')
-      //db.run(createLinkTable)
+      db.run(createLinkTable)
       return db
     }else{
-      return db = new sqlite3.Database('mydatabase.sqlite')
+      let db = new sqlite3.Database('mydatabase.sqlite')
+      return db
     }
   })
 }

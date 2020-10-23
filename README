@@ -1,2 +1,9 @@
 This program is for my master thesis.
 The starting point gave the template of the pdftron Viewer.
+
+TODOS:
+ - fixed document path, when opening/loading/saving documents
+ - when database is created, don't try too creat it again
+ - garbage collection when closing windows
+ - generalise page opening
+ - document id/name mapping for name-changes
