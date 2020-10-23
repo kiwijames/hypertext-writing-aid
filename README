@@ -6,13 +6,16 @@ TODOS:
  - when database is created, don't try too creat it again
  - generalise page opening
  - document id/name mapping for name-changes
-        //DocumentNameMappingTable = 'CREATE TABLE documents (\
-        //  document_id INTEGER PRIMARY KEY AUTOINCREMENT\
-        //  document_name TEXT NOT NULL\
-        //  \
-        //  );'
  - link annotations
  - dont unnecessarily open new pdf if already open
+ - be able to create links on same document
+ - highlight selections that you just linked 
+ - create a proper electron program 
+ - import file by url
+ - share links
+ - name program
+ - creat program icon
+ - pdf window title to pdfname
 
 
 
@@ -28,4 +31,10 @@ TODOS:
     });
     editorWindow.webContents.send('table-data',rowText)
   })*/
+
+    //DocumentNameMappingTable = 'CREATE TABLE documents (\
+//  document_id INTEGER PRIMARY KEY AUTOINCREMENT\
+//  document_name TEXT NOT NULL\
+//  \
+//  );'
 
