@@ -52,7 +52,8 @@ function createHTMLWindow (HTMLFilePath) {
  * @return {BrowserWindow} Window with the PDF in a Viewer.
  */
 function createPDFWindow(pdfFilePath, pageNumber=1, quads) {
-    win = new BrowserWindow({ 
+
+  let win = new BrowserWindow({ 
     width: 800, 
     height: 600 ,
     webPreferences: {
@@ -64,17 +65,13 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads) {
   win.loadFile('public/template.html')
   let contents = win.webContents
   contents.on('dom-ready', () => {
-    console.debug('send pdfFile message: '+pdfFilePath)
     contents.send('pdfFile', pdfFilePath, pageNumber, quads)
   })
   // Uncomment DevTools for debugging
-  //contents.openDevTools()
+  contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object from list
-    console.debug("Removing Window with ID "+win.id)
-    console.debug("Window list before "+windowPDFList)
-    windowPDFList = windowPDFList.filter(w => w.id != win.id)
-    console.debug("Window list now "+windowPDFList)
+    windowPDFList = windowPDFList.filter(w => w.id !== win.id)
     win = null
   })
   windowPDFList.push(win)
@@ -232,29 +229,27 @@ ipcMain.on('linking-answer', (event, arg) => {
   // }
   console.log("link counter: "+linkingCounter)
   if(linkingCounter==0){
-    console.log("arg.pdfname: "+arg.pdfName)
     linkData.docName1 = arg.pdfName
+    console.log("arg.pdfname: "+arg.pdfName)
     linkData.pageNumber1 = arg.pageNumber
+    console.log("quadString2: "+arg.pageNumber)
+    console.log("quadString2: "+arg.pageNumber)
     quadString = JSON.stringify(arg.quads) //.reduce((accumulator, quad) =>{accumulator + quad})
     console.log("quadString: "+quadString)
     linkData.pageSelection1 = quadString
-    editorWindow.webContents.send('link1',arg) //second link
-    data = {
-      toast: true
-    }
-    event.sender.send('link1', data)
+    data = { toast: true }
+    event.sender.send('firstLinkReceived', data)
     linkingCounter++
   }else if (linkingCounter==1) {
     linkData.docName2 = arg.pdfName
+    console.log("quadString2: "+arg.pdfName)
     linkData.pageNumber2 = arg.pageNumber
+    console.log("quadString2: "+arg.pageNumber)
     quadString = JSON.stringify(arg.quads) //.reduce((accumulator, quad) =>{accumulator + quad})
     console.log("quadString2: "+quadString)
     linkData.pageSelection2 = quadString
-    editorWindow.webContents.send('link2',arg) //linking over
-    data = {
-      toast: true
-    }
-    event.sender.send('link2', data)
+    data = { toast: true }
+    event.sender.send('secondLinkReceived', data)
     linkingCounter++
   }
   if (linkingCounter==2) {
@@ -324,9 +319,6 @@ function getPathsFromLinkId(link_id, callback){
   db.all("SELECT * FROM links WHERE link_id="+link_id+";", function(err,rows){//WHERE link_id="+link_id
     //let rowText ="link_id | link_name | name1 | data1 | name2 | data2\n"
     rows.forEach((row) => {
-      console.log("row: "+rows)
-      console.log("element: "+rows[0])
-      console.log("element: "+rows[0].link_name)
       path1 = rows[0].document_name_1
       path2 = rows[0].document_name_2
       pageNumber1 = rows[0].document_data_1
@@ -337,13 +329,9 @@ function getPathsFromLinkId(link_id, callback){
       console.log(quadsString2)
       quads1 = JSON.parse(quadsString1)
       quads2 = JSON.parse(quadsString2)
-      //path1 = row.document_name_1
-      //path2 = row.document_name_2
       linklink(path1,path2,pageNumber1,pageNumber2,quads1,quads2)
     })
   })
-  console.log("path1 in sqlfunction: "+path1)
-  console.log("path2 in sqlfunction: "+path2)
   return {path1,path2}
 }
 

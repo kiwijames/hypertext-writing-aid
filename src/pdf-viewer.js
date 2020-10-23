@@ -1,15 +1,13 @@
 const { ipcRenderer, remote } = require('electron')
-console.log("pdf-viewer.js loaded")
+console.debug("pdf-viewer.js loaded")
 var data
 
 //Wait for pdfFile to be given
 ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads) => {
   var pdfFileName = pdfFile
-  console.log("received message "+pdfFileName)
-  console.log("received quads: "+JSON.stringify(quads["5"]))
-  console.log("received quads: "+quads["5"])
-  //console.log("received quads: "+quads.getString("5"))
-  console.log("received quads: "+quads["5"])
+  console.debug("received pdfFile "+pdfFileName)
+  console.debug("received pageNumber "+pageNumber)
+  console.debug("received quads: "+JSON.stringify(quads))
   createPDFViewer(pdfFileName, pageNumber, quads)
 });
 
@@ -27,25 +25,30 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads){
     const { Annotations, annotManager, docViewer } = instance;
     // wait until the PDF finished loading
     docViewer.on('documentLoaded', () => {
-      docViewer.setCurrentPage(pageNumber)
-      //docViewer.setFitMode("FitWidth")
-      console.log("before quads")
-      if(quads) {
-        console.log("quads: "+JSON.stringify(quads))
-        const highlight = new Annotations.TextHighlightAnnotation();
-        highlight.StrokeColor = new Annotations.Color(255, 255, 0);
-        highlight.PageNumber = 5;
-        highlight.Quads = quads["5"];
-        annotManager.addAnnotation(highlight);
-        annotManager.drawAnnotations(highlight);
-      }
       // ~10 Sekunden bis hier hin vom window start
       console.log("pdf-viewer.js document ready")
-      // I want to create a link
+      
+      // Viewer properties
+      docViewer.setCurrentPage(pageNumber)
+      //docViewer.setFitMode("FitWidth") //not a function..?
+      
+      if(quads) {
+        let highlights = []
+        let pageNumbers = Object.keys(quads)
+        pageNumbers.forEach(num => {
+          let highlight = new Annotations.TextHighlightAnnotation();
+          highlight.PageNumber=num
+          highlight.Quads = quads[num]
+          highlights.push(highlight)
+        })
+        annotManager.addAnnotation(highlights);
+        annotManager.drawAnnotations(highlights);
+      }
+
+      // Message received when wanting to create a link
       ipcRenderer.on('linking-message', (event, arg) => {
-        // next slected text will be linked
+        // more information on quads https://www.pdftron.com/documentation/web/guides/extraction/selected-text/
         docViewer.getTool('TextSelect').one('selectionComplete', (startQuad, allQuads) => {
-          // more information on quads https://www.pdftron.com/documentation/web/guides/extraction/selected-text/
           console.log("selected + sending")
           data = {
             text : docViewer.getSelectedText(),
@@ -60,17 +63,13 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads){
       });
 
       ipcRenderer.on('linking-message', (event, arg) => {
-        if(arg) {
-          if(arg.toast) toastMessage('Mark text to be linked');
-        }
+        if(arg) if(arg.toast) toastMessage('Mark text to be linked');
       });
 
-      ipcRenderer.on('link1', (event, arg) => {
-        if(arg.toast) {
-          toastMessage('Mark the next text to be linked together');
-        }
+      ipcRenderer.on('firstLinkSaved', (event, arg) => {
+        if(arg.toast) toastMessage('Mark the next text to be linked together');
       });
-      ipcRenderer.on('link2', (event, arg) => {
+      ipcRenderer.on('secondLinkReceived', (event, arg) => {
         if(arg.toast)  toastMessageFeedback('Do you want to save the linking?')
       });
 

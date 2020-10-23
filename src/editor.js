@@ -1,31 +1,6 @@
 const { ipcRenderer } = require('electron');
 const fs = require('fs')
 
-var docData1
-var docName1
-var docData2
-var docName2
-
-ipcRenderer.on('link1', (event, data) => {
-    console.log("received message "+data)
-    docName1 = data.pdfName
-    docData1 = data
-    //document.getElementById('document-1-data').value = data.text
-    //document.getElementById('document-1-name').value = data.pdfName
-});
-
-ipcRenderer.on('link2', (event, data) => {
-    console.log("received message "+data)
-    docName2 = data.pdfName
-    docData2 = data
-    //document.getElementById('document-2-data').value = data.text
-    //document.getElementById('document-2-name').value = data.pdfName
-});
-
-/*ipcRenderer.on('table-data', (event, data) => {
-    document.getElementById('database-textarea').value = data
-});*/
-
 ipcRenderer.on('saveTextAsHTML', (event, data) => {
     let filepath = data + ".html"
     let content = document.getElementById('textBox').innerHTML
