@@ -13,20 +13,20 @@ ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads) => {
 
 // All functionality inside, so it starts when document finished loading
 function createPDFViewer(pdfFileName, pageNumber=1, quads){
-  console.log("pdf-viewer.js creating viewer")
+  console.debug("pdf-viewer.js creating viewer")
   const viewerElement = document.getElementById('viewer');
   WebViewer({
     path: '../public/lib',
     initialDoc: pdfFileName, //'../public/files/'+
   }, viewerElement).then(instance => {
-    console.log("pdf-viewer.js viewer ready")
+    console.debug("pdf-viewer.js viewer ready")
     // Interact with APIs here.
     // See https://www.pdftron.com/documentation/web/guides/basic-functionality for more info/
     const { Annotations, annotManager, docViewer } = instance;
     // wait until the PDF finished loading
     docViewer.on('documentLoaded', () => {
       // ~10 Sekunden bis hier hin vom window start
-      console.log("pdf-viewer.js document ready")
+      console.debug("pdf-viewer.js document ready")
       
       // Viewer properties
       docViewer.setCurrentPage(pageNumber)
@@ -49,7 +49,6 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads){
       ipcRenderer.on('linking-message', (event, arg) => {
         // more information on quads https://www.pdftron.com/documentation/web/guides/extraction/selected-text/
         docViewer.getTool('TextSelect').one('selectionComplete', (startQuad, allQuads) => {
-          console.log("selected + sending")
           data = {
             text : docViewer.getSelectedText(),
             windowId : remote.getCurrentWindow().id,
@@ -102,15 +101,11 @@ function toastMessageFeedback(message) {
     console.log("gotten feedback, processing")
     snackbar.className = snackbar.className.replace("show", "");
     data.linkName = feedbackSnackbarText.value
-    console.log("text value: "+feedbackSnackbarText.value)
-    console.log("text value: "+data.linkName)
-    console.log("page number: "+data.pageNumber)
     ipcRenderer.send('save-link', data);
   };
   feedbackSnackbarFalse.onclick = function(){
     console.log("gotten feedback, processing")
     snackbar.className = snackbar.className.replace("show", "");
-    
   };
   //console.log("finished feedbackToast")
   //return await result;//result;

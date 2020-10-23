@@ -230,23 +230,16 @@ ipcMain.on('linking-answer', (event, arg) => {
   console.log("link counter: "+linkingCounter)
   if(linkingCounter==0){
     linkData.docName1 = arg.pdfName
-    console.log("arg.pdfname: "+arg.pdfName)
     linkData.pageNumber1 = arg.pageNumber
-    console.log("quadString2: "+arg.pageNumber)
-    console.log("quadString2: "+arg.pageNumber)
-    quadString = JSON.stringify(arg.quads) //.reduce((accumulator, quad) =>{accumulator + quad})
-    console.log("quadString: "+quadString)
+    quadString = JSON.stringify(arg.quads)
     linkData.pageSelection1 = quadString
     data = { toast: true }
     event.sender.send('firstLinkReceived', data)
     linkingCounter++
   }else if (linkingCounter==1) {
     linkData.docName2 = arg.pdfName
-    console.log("quadString2: "+arg.pdfName)
     linkData.pageNumber2 = arg.pageNumber
-    console.log("quadString2: "+arg.pageNumber)
-    quadString = JSON.stringify(arg.quads) //.reduce((accumulator, quad) =>{accumulator + quad})
-    console.log("quadString2: "+quadString)
+    quadString = JSON.stringify(arg.quads)
     linkData.pageSelection2 = quadString
     data = { toast: true }
     event.sender.send('secondLinkReceived', data)
@@ -261,23 +254,12 @@ ipcMain.on('linking-answer', (event, arg) => {
 
 ipcMain.on('save-link', (event, data) => {
   linkData.linkName = data.linkName
-  console.log("save-link called")
   let insertStatement = "INSERT INTO links(link_name,document_name_1,\
                           document_data_1,document_quads_1,document_name_2,document_data_2,document_quads_2) \
                           VALUES('"+linkData.linkName+"','"+linkData.docName1+"','"+linkData.pageNumber1+"','"+linkData.pageSelection1+"','"+linkData.docName2+"','"+linkData.pageNumber2+"','"+linkData.pageSelection2+"')"
   
   let db = new sqlite3.Database('mydatabase.sqlite')
-  console.log("db: "+db)
   db.run(insertStatement)
-  /*
-  console.log('A row has been inserted');
-  db.all("SELECT * FROM links", function(err,rows){
-    let rowText ="link_id | link_name | name1 | data1 | name2 | data2\n"
-    rows.forEach((row) => {
-      rowText = rowText+row.link_id+"|"+row.link_name+"|"+row.document_name_1+"|"+row.document_data_1+"|"+row.document_name_2+"|"+row.document_data_2+"\n"
-    });
-    editorWindow.webContents.send('table-data',rowText)
-  })*/
 });
 
 
@@ -302,15 +284,13 @@ ipcMain.on('deleteLink', (event, arg) => {
 
 ipcMain.on('call-linked-links', (event, arg) => {
   //arg = link_id
-  console.log(arg)
-  let {path1, path2} = getPathsFromLinkId(arg)
-  console.log(path1)
-  console.log(path2)
-  //linklink(path1,path2)
+  getCompareElementsFromLinkId(arg)
 });
 
 
 ////////////////////////////database functions////////////////////////////////////////
+
+//TODO: remove hard coded function call
 function getPathsFromLinkId(link_id, callback){
   let selectStatement = "SELECT * links WHERE link_id="+link_id;
   let db = new sqlite3.Database('mydatabase.sqlite')
@@ -336,18 +316,28 @@ function getPathsFromLinkId(link_id, callback){
 }
 
 
-
+/**
+ * Deletes entry from the 'links' table,
+ * based on the given link_id.
+ * @param  {Number} link_id Id corresponding to an entry in the 'links' table
+ */
 function deleteLinkEntryById(link_id) {
   let deleteStatement = "DELETE FROM links WHERE link_id="+link_id;
   let db = new sqlite3.Database('mydatabase.sqlite')
   db.run(deleteStatement, function(err){
     if(err){
-      console.error("problem when deleting link")
+      console.error("problem deleting link")
       console.error(err)
-    } else console.log("deleted link with id"+link_id)
+    } else console.debug("deleted link with id"+link_id)
   });
 }
 
+/**
+ * Creates a database with the default schema,
+ * based on the given path and name.
+ * @param  {String} path Path of the sqlite3 database file
+ * @param  {String} databaseName name of the sqlite3 database file
+ */
 function initDatabase(path, databaseName){
   let fullFilePath = pfd.join(path, databaseName)
   //Creating a table automatically includes ROWID
