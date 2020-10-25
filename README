@@ -2,14 +2,17 @@ This program is for my master thesis.
 The starting point gave the template of the pdftron Viewer. (license to be checked)
 
 TODOS:
- - be able to create links on same document
- - be able to use links between pdfs
- - open all links of a document
- - rename 'path' variable to sth else, because of 'path' require
 
+ - allow the user to decide which link to follow (when multiple)
+
+  - rename 'path' variable to sth else, because of 'path' require
+   - on startup select default path of documents or so
+   - check if document moved but same name, ask user?
+ - handel database more general with proper async functionality
+ - dont unnecessarily open new pdf if already open
+   - allow user to decide to open new document on same-document-link
  - fixed document path, when opening/loading/saving documents
  - generalise page opening
- - dont unnecessarily open new pdf if already open
  - document id/name mapping for name-changes
  - link annotations
  - create a proper electron program 
@@ -17,8 +20,7 @@ TODOS:
  - share links
  - name program
  - creat program icon
-
-
+ - save arrangement
 
 
 --Notes--

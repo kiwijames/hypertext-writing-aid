@@ -11,6 +11,7 @@ const app_path = app.getAppPath()
 const dbFileName = 'mydatabase.sqlite'
 const db = initDatabase('', dbFileName)
 let windowPDFList = []
+let idWindowMap = {}
 let editorWindow  
 
 
@@ -74,8 +75,10 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     // Dereference the window object from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
     win = null
+    idWindowMap[pdfFilePath] = null
   })
   windowPDFList.push(win)
+  idWindowMap[pdfFilePath] = win
   return win
 }
 
@@ -249,7 +252,7 @@ ipcMain.on('linking-answer', (event, arg) => {
     linkingCounter++
   }
   if (linkingCounter==2) {
-    linkingCounter=0
+    linkingCounter=0;
   }
   // Return some data to the renderer process with the mainprocess-response ID
   //event.sender.send('mainprocess-response', "Hello World!");
@@ -262,7 +265,17 @@ ipcMain.on('save-link', (event, data) => {
                           VALUES('"+linkData.linkName+"','"+linkData.docName1+"','"+linkData.pageNumber1+"','"+linkData.pageSelection1+"','"+linkData.docName2+"','"+linkData.pageNumber2+"','"+linkData.pageSelection2+"')"
   
   let db = new sqlite3.Database('mydatabase.sqlite')
-  db.run(insertStatement)
+  db.run(insertStatement, function(err){
+    if(err){
+      console.log(err)
+    }else{
+      lastLinkId = this.lastID
+      console.log("last_insert_rowid row: "+lastLinkId)
+      windowPDFList.map(window => {
+        window.webContents.send('updateTempLinks', lastLinkId)
+      });
+    }
+  });
 });
 
 
@@ -295,7 +308,7 @@ ipcMain.on('openOtherLink', (event, data) => {
   //  linkId : linkId,
   //  pdfName : pdfFileName
   //}
-  openOtherLink(data.linkId, data.pdfFileName)
+  openOtherLink(data.linkId, data.pdfName)
 });
 
 
@@ -305,17 +318,30 @@ ipcMain.on('openOtherLink', (event, data) => {
 function openOtherLink(link_id, pdfName){
   let selectStatement = "SELECT * links WHERE link_id="+link_id;
   let db = new sqlite3.Database('mydatabase.sqlite')
+  if(!link_id) return;
   db.all("SELECT * FROM links WHERE link_id="+link_id+";", function(err,rows){ //only 1 row, as id unique
     if(err){
       console.error("problem getting link")
       console.error(err)
     }else{
       let row = rows[0]
+      console.log(pdfName+" == "+row.document_name_1)
       if(pdfName == row.document_name_1){
-        createPDFWindow(row.document_name_2, row.document_data_2, JSON.parse(row.document_quads_2), link_id)
-        
+        doc = row.document_name_2
+        if(idWindowMap[doc]){
+          let win = idWindowMap[doc]
+          console.log("focus on "+doc)
+          win.focus()
+          win.webContents.send('focusText',row.document_data_2)
+        }else createPDFWindow(doc, row.document_data_2, JSON.parse(row.document_quads_2), link_id)
       }else{
-        createPDFWindow(row.document_name_1, row.document_data_1, JSON.parse(row.document_quads_1), link_id)
+        doc = row.document_name_1
+        if(idWindowMap[doc]){
+          let win = idWindowMap[doc]
+          console.log("focus on "+doc)
+          win.focus()
+          win.webContents.send('focusText',row.document_data_1)
+        }else createPDFWindow(doc, row.document_data_1, JSON.parse(row.document_quads_1), link_id)
       }
     }
   })
@@ -324,12 +350,9 @@ function openOtherLink(link_id, pdfName){
 
 //TODO: remove hard coded function call
 function compareElementsFromLinkId(link_id, callback){
-  let selectStatement = "SELECT * links WHERE link_id="+link_id;
+  let selectStatement = "SELECT * from links WHERE link_id="+link_id;
   let db = new sqlite3.Database('mydatabase.sqlite')
-  var path1
-  var path2
-  db.all("SELECT * FROM links WHERE link_id="+link_id+";", function(err,rows){//WHERE link_id="+link_id
-    //let rowText ="link_id | link_name | name1 | data1 | name2 | data2\n"
+  db.all(selectStatement, function(err,rows){
     rows.forEach((row) => {
       path1 = rows[0].document_name_1
       path2 = rows[0].document_name_2
@@ -337,14 +360,11 @@ function compareElementsFromLinkId(link_id, callback){
       pageNumber2 = rows[0].document_data_2
       quadsString1 = rows[0].document_quads_1
       quadsString2 = rows[0].document_quads_2
-      console.log(quadsString1)
-      console.log(quadsString2)
       quads1 = JSON.parse(quadsString1)
       quads2 = JSON.parse(quadsString2)
       linklink(path1,path2,pageNumber1,pageNumber2,quads1,quads2,link_id)
     })
   })
-  return {path1,path2}
 }
 
 

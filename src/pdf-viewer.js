@@ -1,14 +1,15 @@
-const { ipcRenderer, remote } = require('electron')
+const { ipcRenderer, remote} = require('electron')
 console.debug("pdf-viewer.js loaded")
 var data
+const sqlite3 = require('sqlite3').verbose();
 
 //Wait for pdfFile to be given
 ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads, link_id) => {
   var pdfFileName = pdfFile
   console.log("linkid: "+link_id)
-  console.debug("received pdfFile "+pdfFileName)
-  console.debug("received pageNumber "+pageNumber)
-  console.debug("received quads: "+JSON.stringify(quads))
+  console.log("received pdfFile "+pdfFileName)
+  console.log("received pageNumber "+pageNumber)
+  console.log("received quads: "+JSON.stringify(quads))
   createPDFViewer(pdfFileName, pageNumber, quads, link_id)
 });
 
@@ -32,12 +33,14 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id){
       docViewer.setCurrentPage(pageNumber)
       //docViewer.setFitMode("FitWidth") //not a function..?
 
-      // Highlight links if given
+      // Highlight link if given
       if(quads) highlightQuads(Annotations, annotManager, quads, link_id)
+      allAnnotationsWithLinks(Annotations, annotManager, pdfFileName)
+
       // Message received when wanting to create a link
       ipcRenderer.on('linking-message', (event, arg) => {
         // more information on quads https://www.pdftron.com/documentation/web/guides/extraction/selected-text/
-        docViewer.getTool('TextSelect').one('selectionComplete', (startQuad, allQuads) => {
+        docViewer.getTool('TextSelect').on('selectionComplete', (startQuad, allQuads) => {
           data = {
             text : docViewer.getSelectedText(),
             windowId : remote.getCurrentWindow().id,
@@ -46,19 +49,29 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id){
             quads: allQuads,
             linkName: "default"
           }
-          highlightQuads(Annotations, annotManager, allQuads)
+          highlightQuads(Annotations, annotManager, allQuads, null, true)
           ipcRenderer.send('linking-answer', data);
         });
       });
-
-      annotManager.on('annotationDoubleClicked', (annot) => {
-        let linkId = annot.getCustomData('linkId')
-        data = {
-          linkId : linkId,
-          pdfName : pdfFileName
+      
+      
+      pdfViewerWindow = document.getElementById('webviewer-1').contentWindow; //assuming webviewe-1 is allways there
+      pdfViewerWindow.addEventListener("dblclick", function(event){
+        console.log("clicked event inside getAnnotations")
+        annoList = annotManager.getAnnotationsByMouseEvent(event)
+        if(annoList){
+          //let user choose
+          annoList.forEach(annot =>{
+            let linkId = annot.getCustomData('linkId')
+            data = {
+              linkId : linkId,
+              pdfName : pdfFileName
+            }
+            ipcRenderer.send('openOtherLink', data);
+          })
         }
-        ipcRenderer.send('openOtherLink', data);
       });
+      
 
       ipcRenderer.on('linking-message', (event, arg) => {
         if(arg) if(arg.toast) toastMessage('Mark text to be linked');
@@ -71,13 +84,33 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id){
         if(arg.toast)  toastMessageFeedback('Do you want to save the linking?')
       });
 
+      ipcRenderer.on('focusText', (event, arg) => {
+        console.log("open page "+arg)
+        docViewer.setCurrentPage(arg)
+      });
+      
+
+      ipcRenderer.on('updateTempLinks', (event, arg) => {
+        let link_id = arg
+        //update all annotations without link_id with this
+        annotList = annotManager.getAnnotationsList()
+        annotList.forEach(x => {
+          if(x.getCustomData('tmp')){
+            x.deleteCustomData('tmp')
+            x.setCustomData('linkId',link_id)
+            annotManager.redrawAnnotation(x);
+          }
+        });
+      });
+      
+
     })//PDFDocumentLoaded
   })
 }
 
 
 
-function highlightQuads(Annotations, annotManager, quads, link_id) {
+function highlightQuads(Annotations, annotManager, quads, link_id, tmpFlag) {
   let highlights = []
   let pageNumbers = Object.keys(quads)
   let lenth = Object.keys(quads).length
@@ -85,7 +118,8 @@ function highlightQuads(Annotations, annotManager, quads, link_id) {
     let highlight = new Annotations.TextHighlightAnnotation();
     highlight.PageNumber=num
     highlight.Quads = quads[num]
-    highlight.setCustomData('linkId', link_id)
+    if(!tmpFlag) highlight.setCustomData('linkId', link_id)
+    else highlight.setCustomData('tmp', true)
     highlights.push(highlight)
   })
   annotManager.addAnnotation(highlights);
@@ -120,11 +154,38 @@ function toastMessageFeedback(message) {
     snackbar.className = snackbar.className.replace("show", "");
     data.linkName = feedbackSnackbarText.value
     ipcRenderer.send('save-link', data);
+    //send message from main to add links to tmp highlights
   };
   feedbackSnackbarFalse.onclick = function(){
     console.log("gotten feedback, processing")
     snackbar.className = snackbar.className.replace("show", "");
+    //send message from main to remove tmp highlights
   };
   //console.log("finished feedbackToast")
   //return await result;//result;
+}
+
+//write all annotations from the database into the pdf
+function allAnnotationsWithLinks(Annotations, annotManager, pdfFileName){
+  let selectStatement = "SELECT * from links WHERE document_name_1 LIKE '"+pdfFileName+"' OR document_data_2 LIKE '"+pdfFileName+"'";
+  let db = new sqlite3.Database('mydatabase.sqlite')
+  db.all(selectStatement, function(err,rows){
+    if(err){
+      console.error("problem getting link")
+      console.error(err)
+    }else{
+      console.log("now print rows")
+      rows.forEach((row) => {
+        console.log("reihe "+row)
+        quads1 = JSON.parse(row.document_quads_1)
+        quads2 = JSON.parse(row.document_quads_2)
+        if(row.document_name_1 == pdfFileName){
+          highlightQuads(Annotations, annotManager, quads1, row.link_id)
+        }
+        if(row.document_name_2 == pdfFileName){
+          highlightQuads(Annotations, annotManager, quads2, row.link_id)
+        }
+      })
+    }
+  })
 }
