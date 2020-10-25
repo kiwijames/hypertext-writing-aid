@@ -51,7 +51,7 @@ function createHTMLWindow (HTMLFilePath) {
  * @param  {Number} pageNumber On which page to open the file.
  * @return {BrowserWindow} Window with the PDF in a Viewer.
  */
-function createPDFWindow(pdfFilePath, pageNumber=1, quads) {
+function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
 
   let win = new BrowserWindow({ 
     width: 800, 
@@ -60,12 +60,13 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads) {
       nodeIntegration:true,
       webSecurity: false
   }});
+  win.setTitle(pfd.basename(pdfFilePath))
   win.setMenu(menuPDF)
   //win.setMenuBarVisibility(false)
   win.loadFile('public/template.html')
   let contents = win.webContents
   contents.on('dom-ready', () => {
-    contents.send('pdfFile', pdfFilePath, pageNumber, quads)
+    contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
   // Uncomment DevTools for debugging
   contents.openDevTools()
@@ -175,13 +176,15 @@ Menu.setApplicationMenu(menu);
  * @param  {Number} pageNumber2 On which page to open the file.
  * @param  {Object} quads1 PDFtron values of linked elements.
  * @param  {Object} quads1 PDFtron values of linked elements.
+ * @param  {Number} link_id The link id for using the links.
  */
-function linklink(pdfPath1,pdfPath2,pageNumber1=1,pageNumber2=1,quads1,quads2){
+function linklink(pdfPath1,pdfPath2,pageNumber1=1,pageNumber2=1,quads1,quads2, link_id){
   const {screen} = require('electron')
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
 
-  let win1 = createPDFWindow(pdfPath1,pageNumber1,quads1)
-  let win2 = createPDFWindow(pdfPath2,pageNumber2,quads2)
+  console.log(link_id)
+  let win1 = createPDFWindow(pdfPath1,pageNumber1,quads1,link_id)
+  let win2 = createPDFWindow(pdfPath2,pageNumber2,quads2,link_id)
   win1.setSize(width/2,height)
   win2.setSize(width/2,height)
   win1.setPosition(0,0)
@@ -284,14 +287,43 @@ ipcMain.on('deleteLink', (event, arg) => {
 
 ipcMain.on('call-linked-links', (event, arg) => {
   //arg = link_id
-  getCompareElementsFromLinkId(arg)
+  compareElementsFromLinkId(arg)
+});
+
+ipcMain.on('openOtherLink', (event, data) => {
+  //data = {
+  //  linkId : linkId,
+  //  pdfName : pdfFileName
+  //}
+  openOtherLink(data.linkId, data.pdfFileName)
 });
 
 
 ////////////////////////////database functions////////////////////////////////////////
 
 //TODO: remove hard coded function call
-function getPathsFromLinkId(link_id, callback){
+function openOtherLink(link_id, pdfName){
+  let selectStatement = "SELECT * links WHERE link_id="+link_id;
+  let db = new sqlite3.Database('mydatabase.sqlite')
+  db.all("SELECT * FROM links WHERE link_id="+link_id+";", function(err,rows){ //only 1 row, as id unique
+    if(err){
+      console.error("problem getting link")
+      console.error(err)
+    }else{
+      let row = rows[0]
+      if(pdfName == row.document_name_1){
+        createPDFWindow(row.document_name_2, row.document_data_2, JSON.parse(row.document_quads_2), link_id)
+        
+      }else{
+        createPDFWindow(row.document_name_1, row.document_data_1, JSON.parse(row.document_quads_1), link_id)
+      }
+    }
+  })
+}
+
+
+//TODO: remove hard coded function call
+function compareElementsFromLinkId(link_id, callback){
   let selectStatement = "SELECT * links WHERE link_id="+link_id;
   let db = new sqlite3.Database('mydatabase.sqlite')
   var path1
@@ -309,7 +341,7 @@ function getPathsFromLinkId(link_id, callback){
       console.log(quadsString2)
       quads1 = JSON.parse(quadsString1)
       quads2 = JSON.parse(quadsString2)
-      linklink(path1,path2,pageNumber1,pageNumber2,quads1,quads2)
+      linklink(path1,path2,pageNumber1,pageNumber2,quads1,quads2,link_id)
     })
   })
   return {path1,path2}

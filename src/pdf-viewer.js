@@ -3,16 +3,17 @@ console.debug("pdf-viewer.js loaded")
 var data
 
 //Wait for pdfFile to be given
-ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads) => {
+ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads, link_id) => {
   var pdfFileName = pdfFile
+  console.log("linkid: "+link_id)
   console.debug("received pdfFile "+pdfFileName)
   console.debug("received pageNumber "+pageNumber)
   console.debug("received quads: "+JSON.stringify(quads))
-  createPDFViewer(pdfFileName, pageNumber, quads)
+  createPDFViewer(pdfFileName, pageNumber, quads, link_id)
 });
 
 // All functionality inside, so it starts when document finished loading
-function createPDFViewer(pdfFileName, pageNumber=1, quads){
+function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id){
   console.debug("pdf-viewer.js creating viewer")
   const viewerElement = document.getElementById('viewer');
   WebViewer({
@@ -27,24 +28,12 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads){
     docViewer.on('documentLoaded', () => {
       // ~10 Sekunden bis hier hin vom window start
       console.debug("pdf-viewer.js document ready")
-      
       // Viewer properties
       docViewer.setCurrentPage(pageNumber)
       //docViewer.setFitMode("FitWidth") //not a function..?
-      
-      if(quads) {
-        let highlights = []
-        let pageNumbers = Object.keys(quads)
-        pageNumbers.forEach(num => {
-          let highlight = new Annotations.TextHighlightAnnotation();
-          highlight.PageNumber=num
-          highlight.Quads = quads[num]
-          highlights.push(highlight)
-        })
-        annotManager.addAnnotation(highlights);
-        annotManager.drawAnnotations(highlights);
-      }
 
+      // Highlight links if given
+      if(quads) highlightQuads(Annotations, annotManager, quads, link_id)
       // Message received when wanting to create a link
       ipcRenderer.on('linking-message', (event, arg) => {
         // more information on quads https://www.pdftron.com/documentation/web/guides/extraction/selected-text/
@@ -57,8 +46,18 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads){
             quads: allQuads,
             linkName: "default"
           }
+          highlightQuads(Annotations, annotManager, allQuads)
           ipcRenderer.send('linking-answer', data);
         });
+      });
+
+      annotManager.on('annotationDoubleClicked', (annot) => {
+        let linkId = annot.getCustomData('linkId')
+        data = {
+          linkId : linkId,
+          pdfName : pdfFileName
+        }
+        ipcRenderer.send('openOtherLink', data);
       });
 
       ipcRenderer.on('linking-message', (event, arg) => {
@@ -75,6 +74,25 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads){
     })//PDFDocumentLoaded
   })
 }
+
+
+
+function highlightQuads(Annotations, annotManager, quads, link_id) {
+  let highlights = []
+  let pageNumbers = Object.keys(quads)
+  let lenth = Object.keys(quads).length
+  pageNumbers.forEach(num => {
+    let highlight = new Annotations.TextHighlightAnnotation();
+    highlight.PageNumber=num
+    highlight.Quads = quads[num]
+    highlight.setCustomData('linkId', link_id)
+    highlights.push(highlight)
+  })
+  annotManager.addAnnotation(highlights);
+  annotManager.drawAnnotationsFromList(highlights);
+}
+
+
 
 function toastMessage(message) {
   let snackbar = document.getElementById("snackbar");
