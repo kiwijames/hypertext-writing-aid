@@ -1,6 +1,7 @@
 # hypertext-writing-aid
 mydatabase.sqlite
 *.pdf
+/dist
 
 # PdfTron WebViewer
 public/lib
