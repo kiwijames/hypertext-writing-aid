@@ -2,6 +2,7 @@
 mydatabase.sqlite
 *.pdf
 /dist
+.directory
 
 # PdfTron WebViewer
 public/lib

@@ -30,20 +30,7 @@
   },
   "build": {
     "appId": "org.upb.hypertextwritingaid",
-    "dmg": {
-      "contents": [
-        {
-          "x": 110,
-          "y": 150
-        },
-        {
-          "x": 240,
-          "y": 150,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    },
+    "files": [""build/**/*"],
     "linux": {
       "category": "Education",
       "target": [
@@ -52,8 +39,7 @@
       ]
     },
     "win": {
-      "target": "NSIS",
-      "icon": "build/icon.ico"
+      "target": "NSIS"
     }
   }
 }
