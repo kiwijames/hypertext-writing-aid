@@ -1,4 +1,5 @@
 mydatabase.sqlite
+*.pdf
 
 # WebViewer
 public/lib
