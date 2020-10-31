@@ -70,7 +70,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
   // Uncomment DevTools for debugging
-  contents.openDevTools()
+  //contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)

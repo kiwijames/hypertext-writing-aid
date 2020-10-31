@@ -4,15 +4,17 @@
   "description": "Master thesis prototype demonstrating the possiblities of hypertext as a writing aid for scientific thesis",
   "main": "./src/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "postinstall": "install-app-deps",
+    "pack": "build --dir",
+    "dist": "build"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kiwijames/hypertext-writing-aid.git"
   },
-  "author": "Kevin Taylor",
+  "author": "Kevin Taylor <taylork@mail.uni-paderborn.de>",
   "license": "ISC",
-  "homepage": "",
   "devDependencies": {
     "btoa": "^1.2.1",
     "download": "^7.1.0",
@@ -25,5 +27,33 @@
     "@pdftron/webviewer": "^7.0.0",
     "tabulator-tables": "^4.8.2",
     "sqlite3": "^5.0.0"
+  },
+  "build": {
+    "appId": "org.upb.hypertextwritingaid",
+    "category": "public.app-category.hypertextwritingaid",
+    "dmg": {
+      "contents": [
+        {
+          "x": 110,
+          "y": 150
+        },
+        {
+          "x": 240,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "win": {
+      "target": "NSIS",
+      "icon": "build/icon.ico"
+    }
   }
 }
