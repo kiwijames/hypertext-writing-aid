@@ -1,7 +1,8 @@
+# hypertext-writing-aid
 mydatabase.sqlite
 *.pdf
 
-# WebViewer
+# PdfTron WebViewer
 public/lib
 public/webviewer
 public/license-key.js
