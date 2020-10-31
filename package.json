@@ -1,7 +1,7 @@
 {
-  "name": "webviewer-electron-sample",
+  "name": "hypertext-writing-aid",
   "version": "1.0.0",
-  "description": "Sample to demonstrate integrating WebViewer into an Electron App",
+  "description": "Master thesis prototype demonstrating the possiblities of hypertext as a writing aid for scientific thesis",
   "main": "./src/main.js",
   "scripts": {
     "start": "electron .",
@@ -9,14 +9,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PDFTron/webviewer-electron-sample.git"
+    "url": "git+https://github.com/kiwijames/hypertext-writing-aid.git"
   },
-  "author": "",
+  "author": "Kevin Taylor",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/PDFTron/webviewer-electron-sample/issues"
-  },
-  "homepage": "https://github.com/PDFTron/webviewer-electron-sample#readme",
+  "homepage": "",
   "devDependencies": {
     "btoa": "^1.2.1",
     "download": "^7.1.0",
@@ -26,6 +23,7 @@
   },
   "dependencies": {
     "@pdftron/webviewer": "^7.0.0",
-    "tabulator-tables": "^4.8.2"
+    "tabulator-tables": "^4.8.2", 
+    "sqlite3": "^5.0.0"
   }
 }
