@@ -30,7 +30,7 @@
   },
   "build": {
     "appId": "org.upb.hypertextwritingaid",
-    "files": [""build/**/*"],
+    "files": ["**/*", "build/icon.*"],
     "linux": {
       "category": "Education",
       "target": [
