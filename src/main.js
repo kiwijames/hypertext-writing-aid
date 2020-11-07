@@ -70,7 +70,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
   // Uncomment DevTools for debugging
-  //contents.openDevTools()
+  contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
@@ -205,13 +205,16 @@ app.on('ready', () => {
     if (openFilePath !== "") {
       try{
         console.log(openFilePath);
-        createPDFWindow(openFilePath)}catch(e){
-          dialog.showErrorBox("opening pdf problem", e + " und datei: "+openFilePath)
-        }
+        createPDFWindow(openFilePath)}
+      catch(e){
+        dialog.showErrorBox("opening pdf problem", e + " und datei: "+openFilePath)
+      }
     }
   }
 
-  if(windowPDFList == []) editorWindow = createHTMLWindow('public/editor.html')
+  if(process.argv.length < 2) {
+    editorWindow = createHTMLWindow('public/editor.html')
+  }
 })
 
 // Quit when all windows are closed.
