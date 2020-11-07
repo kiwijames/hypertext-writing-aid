@@ -1,4 +1,4 @@
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, remote } = require('electron');
 const fs = require('fs')
 
 ipcRenderer.on('saveTextAsHTML', (event, data) => {

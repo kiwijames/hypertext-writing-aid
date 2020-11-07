@@ -7,9 +7,12 @@ const sqlite3 = require('sqlite3').verbose();
 // be closed automatically when the JavaScript object is garbage collected.
 
 
-const app_path = app.getAppPath()
+const appBasePath = app.getAppPath()
 const dbFileName = 'mydatabase.sqlite'
-const db = initDatabase('', dbFileName)
+const fullDbPath = pfd.join(appBasePath,dbFileName)
+if(fs.existsSync(fullDbPath)) {
+  const db = initDatabase(fullDbPath)
+}
 let windowPDFList = []
 let idWindowMap = {}
 let editorWindow  
@@ -201,8 +204,9 @@ app.on('ready', () => {
 
   // If app is opend on windows by opening a file 
   if (process.platform == 'win32' && process.argv.length >= 2) {
-    var openFilePath = process.argv[1];
-    if (openFilePath == "asdad") {
+    let openFilePath = process.argv[1];
+    let fileExtension = pfd.extname(openFilePath)
+    if (openFilePath !== "" && fileExtension.toLocaleLowerCase == "pdf") {
       try{
         console.log(openFilePath);
         createPDFWindow(openFilePath)}
@@ -212,7 +216,7 @@ app.on('ready', () => {
     }
   }
 
-    editorWindow = createHTMLWindow('public/editor.html')
+  if(windowPDFList.length == 0) editorWindow = createHTMLWindow('public/editor.html')
 })
 
 // Quit when all windows are closed.
@@ -328,7 +332,7 @@ ipcMain.on('openOtherLink', (event, data) => {
 
 ////////////////////////////database functions////////////////////////////////////////
 
-//TODO: remove hard coded function call
+//TODO: remove hard coded function call, do with callback
 function openOtherLink(link_id, pdfName){
   let selectStatement = "SELECT * links WHERE link_id="+link_id;
   let db = new sqlite3.Database('mydatabase.sqlite')
@@ -362,7 +366,7 @@ function openOtherLink(link_id, pdfName){
 }
 
 
-//TODO: remove hard coded function call
+//TODO: remove hard coded function call, do with callback
 function compareElementsFromLinkId(link_id, callback){
   let selectStatement = "SELECT * from links WHERE link_id="+link_id;
   let db = new sqlite3.Database('mydatabase.sqlite')
@@ -389,7 +393,7 @@ function compareElementsFromLinkId(link_id, callback){
  */
 function deleteLinkEntryById(link_id) {
   let deleteStatement = "DELETE FROM links WHERE link_id="+link_id;
-  let db = new sqlite3.Database('mydatabase.sqlite')
+  let db = new sqlite3.Database(fullDbPath)
   db.run(deleteStatement, function(err){
     if(err){
       console.error("problem deleting link")
@@ -401,11 +405,10 @@ function deleteLinkEntryById(link_id) {
 /**
  * Creates a database with the default schema,
  * based on the given path and name.
- * @param  {String} path Path of the sqlite3 database file
- * @param  {String} databaseName name of the sqlite3 database file
+ * @param  {String} fullDbPath Complete path of the sqlite3 database file
  */
-function initDatabase(path, databaseName){
-  let fullFilePath = pfd.join(path, databaseName)
+function initDatabase(fullDbPath){
+  let fullFilePath = fullDbPath
   //Creating a table automatically includes ROWID
   //document_name_X is the name of the document in which the link was set
   //document_data includes the text, as well as the quads and page_number

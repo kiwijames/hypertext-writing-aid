@@ -8,12 +8,12 @@ const sqlite3 = require('sqlite3').verbose();
 ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads, link_id) => {
   var appBasePath = remote.app.getAppPath()
   var pdfFilePath = pfd.resolve(pdfFile)
-  //var pdfPath = "C:\\Users\\Kevin\\Downloads" //pfd.resolve(pfd.dirname(pdfFile))
-  console.log("baseBath: "+appBasePath)
-  console.log("linkid: "+link_id)
-  console.log("received pdfFile "+pdfFilePath)
-  console.log("received pageNumber "+pageNumber)
-  console.log("received quads: "+JSON.stringify(quads))
+  // putting vars into debug log
+    console.debug("baseBath: "+appBasePath)
+    console.debug("linkid: "+link_id)
+    console.debug("received pdfFile "+pdfFilePath)
+    console.debug("received pageNumber "+pageNumber)
+    console.debug("received quads: "+JSON.stringify(quads))
   createPDFViewer(pdfFilePath, pageNumber, quads, link_id, appBasePath)
 });
 
@@ -21,8 +21,9 @@ ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads, link_id) => {
 function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath){
   console.debug("pdf-viewer.js creating viewer")
   const viewerElement = document.getElementById('viewer');
+  let webviewerPath = pfd.resolve(pfd.join(appBasePath,'node_modules/@pdftron/webviewer/public'))
   WebViewer({
-    path: pfd.resolve(pfd.join(appBasePath,'node_modules/@pdftron/webviewer/public')),
+    path: webviewerPath,
     initialDoc: pdfFileName,
   }, viewerElement).then(instance => {
     console.debug("pdf-viewer.js viewer ready")
