@@ -205,7 +205,7 @@ app.on('ready', () => {
     if (openFilePath !== "") {
       try{
         console.log(openFilePath);
-        createPDFWindow(pdfFilePath)}catch(e){
+        createPDFWindow(openFilePath)}catch(e){
           dialog.showErrorBox("opening pdf problem", e + " und datei: "+openFilePath)
         }
     }
