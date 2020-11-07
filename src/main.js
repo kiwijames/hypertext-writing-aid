@@ -203,8 +203,11 @@ app.on('ready', () => {
   if (process.platform == 'win32' && process.argv.length >= 2) {
     var openFilePath = process.argv[1];
     if (openFilePath !== "") {
+      try{
         console.log(openFilePath);
-        createPDFWindow(pdfFilePath)
+        createPDFWindow(pdfFilePath)}catch(e){
+          dialog.showErrorBox("opening pdf problem", e + " und datei: "+openFilePath)
+        }
     }
   }
 
