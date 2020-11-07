@@ -198,7 +198,17 @@ function linklink(pdfPath1,pdfPath2,pageNumber1=1,pageNumber2=1,quads1,quads2, l
 
 // Create main window when ready
 app.on('ready', () => {
-    editorWindow = createHTMLWindow('public/editor.html')
+
+  // If app is opend on windows by opening a file 
+  if (app.process.platform == 'win32' && app.process.argv.length >= 2) {
+    var openFilePath = app.process.argv[1];
+    if (openFilePath !== "") {
+        console.log(openFilePath);
+        createPDFWindow(pdfFilePath)
+    }
+  }
+
+  if(windowPDFList != []) editorWindow = createHTMLWindow('public/editor.html')
 })
 
 // Quit when all windows are closed.
