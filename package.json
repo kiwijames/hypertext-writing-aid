@@ -30,7 +30,19 @@
   },
   "build": {
     "appId": "org.upb.hypertextwritingaid",
-    "files": ["**/*", "build/icon.*"],
+    "files": [
+      "**/*", 
+      "build/icon.*"
+    ],
+    "fileAssociations": [
+      {
+        "ext": "pdf",
+        "name": "Hypertext Writing Aid PDF-Viewer",
+        "description": "PDF-Viewer that allows linking between PDF sections",
+        "role": "Viewer",
+        "perMachine": true
+      }
+    ],
     "linux": {
       "category": "Education",
       "target": [
