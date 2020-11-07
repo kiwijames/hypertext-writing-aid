@@ -1,25 +1,27 @@
 const { ipcRenderer, remote} = require('electron')
+const pfd = require('path');
 console.debug("pdf-viewer.js loaded")
 var data
 const sqlite3 = require('sqlite3').verbose();
 
 //Wait for pdfFile to be given
 ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads, link_id) => {
-  var pdfFileName = pdfFile
+  var pdfFileName = pfd.basename(pdfFile)+pfd.extname(pdfFile)
+  var pdfPath = pfd.dirname(pdfFile)
   console.log("linkid: "+link_id)
   console.log("received pdfFile "+pdfFileName)
   console.log("received pageNumber "+pageNumber)
   console.log("received quads: "+JSON.stringify(quads))
-  createPDFViewer(pdfFileName, pageNumber, quads, link_id)
+  createPDFViewer(pdfFileName, pdfPath, pageNumber, quads, link_id)
 });
 
 // All functionality inside, so it starts when document finished loading
-function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id){
+function createPDFViewer(pdfFileName, pdfPath, pageNumber=1, quads, link_id){
   console.debug("pdf-viewer.js creating viewer")
   const viewerElement = document.getElementById('viewer');
   WebViewer({
-    path: '../public/lib',
-    initialDoc: pdfFileName, //'../public/files/'+
+    path: pdfPath,
+    initialDoc: pdfFileName,
   }, viewerElement).then(instance => {
     console.debug("pdf-viewer.js viewer ready")
     // Interact with APIs here.
