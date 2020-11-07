@@ -39,8 +39,7 @@
         "ext": "pdf",
         "name": "Hypertext Writing Aid PDF-Viewer",
         "description": "PDF-Viewer that allows linking between PDF sections",
-        "role": "Viewer",
-        "perMachine": true
+        "role": "Viewer"
       }
     ],
     "linux": {
@@ -53,6 +52,9 @@
     "win": {
       "target": "NSIS", 
       "icon": "build/icon.ico"
+    }, 
+    "nsis":{
+      "perMachine": true
     }
   }
 }
