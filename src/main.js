@@ -202,7 +202,7 @@ app.on('ready', () => {
   // If app is opend on windows by opening a file 
   if (process.platform == 'win32' && process.argv.length >= 2) {
     var openFilePath = process.argv[1];
-    if (openFilePath !== "") {
+    if (openFilePath == "asdad") {
       try{
         console.log(openFilePath);
         createPDFWindow(openFilePath)}
@@ -212,9 +212,7 @@ app.on('ready', () => {
     }
   }
 
-  if(process.argv.length < 2) {
     editorWindow = createHTMLWindow('public/editor.html')
-  }
 })
 
 // Quit when all windows are closed.
