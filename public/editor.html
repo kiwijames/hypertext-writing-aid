@@ -165,6 +165,10 @@ function callLinkedLinks(linkID){
   const { ipcRenderer } = require('electron');
   ipcRenderer.send('call-linked-links',linkID);
 }
+function callinternalLink(linkID){
+  const { ipcRenderer } = require('electron');
+    ipcRenderer.send('call-pdf-link',linkID);
+}
 </script>
 </body>
 </html>

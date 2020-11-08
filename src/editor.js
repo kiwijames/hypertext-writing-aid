@@ -1,4 +1,4 @@
-const { ipcRenderer, remote } = require('electron');
+const { ipcRenderer, remote, dialog, ipcMain } = require('electron');
 const fs = require('fs')
 
 ipcRenderer.on('saveTextAsHTML', (event, data) => {
@@ -26,11 +26,64 @@ ipcRenderer.on('loadText', (event, data) => {
     });
 });
 
+ipcRenderer.on('internal-link-step3', (event, data) => { 
+    //origSender = pdf window that sent the link, now return link
+    origSenderId = data.origSenderId
+    ipcRenderer.on('internal-link-step4', (event) => {  
+        //data = {
+        //  text : text,
+        //  windowId : remote.getCurrentWindow().id,
+        //  pdfName : pdfFileName,
+        //  pageNumber: page,
+        //  quads: quads,
+        //  linkName: "default"
+        //}
+        let pdfLinkData = data;
+        let textBox = document.getElementById('textBox')
+        let selectedText = window.getSelection()
+        let newTextElement = document.createElement('a');
+        newTextElement.appendChild(document.createTextNode(selectedText));
+        newTextElement.setAttribute('href',"#")
+
+        if(!textBox.innerText.includes(selectedText)){
+            alert('please select the text first')
+            ipcRenderer.send('internal-link-step2',pdfLinkData)
+        }else{
+            let dataToPutInDb = {
+                link_name: 'tbd', 
+                doc_name: 'tbd',
+                doc_text: 'tbd', 
+                doc_range: 'tbd', 
+                pdf_name: pdfLinkData.pdfName, 
+                pdf_data: pdfLinkData.pageNumber, 
+                pdf_quads: pdfLinkData.quads, 
+            }
+            dataToPutInDb.origSenderId = origSenderId
+            ipcRenderer.send('internal-link-step5',dataToPutInDb)
+            //TODO: store link data and give function link to anchor in text
+            
+            ipcRenderer.on('internal-link-step6', (event, data, ) => { 
+                linkingFunction = "callinternalLink("+data+");"
+                newTextElement.setAttribute('onclick',linkingFunction)
+
+                if (selectedText.rangeCount) {
+                    let range = selectedText.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(newTextElement);
+
+                }else{
+                    alert("something with the linking went wrong: no range")
+                }
+            });
+        }
+    });
+});
+
+
+
 document.addEventListener('DOMContentLoaded', function() {
     //let linkNameString = document.getElementById('link-name');
     let addLocalLinkButton = document.getElementById('addLocalLink');
-
-
 
     addLocalLinkButton.onclick = function(){
         let textBox = document.getElementById('textBox')
@@ -88,7 +141,12 @@ document.addEventListener('DOMContentLoaded', function() {
 })
 
 
+//has to be put into html editor file
 function callLinkedLinks(linkID){
     ipcRenderer.send('call-linked-links',linkID);
 }
 
+//has to be put into html editor file
+function callinternalLink(linkID){
+    ipcRenderer.send('call-pdf-link',linkID);
+}

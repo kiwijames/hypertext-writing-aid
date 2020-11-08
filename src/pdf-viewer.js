@@ -76,12 +76,20 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
         if(annoList){
           //let user choose
           annoList.forEach(annot =>{
+            //check if i is in linkId
             let linkId = annot.getCustomData('linkId')
-            data = {
-              linkId : linkId,
-              pdfName : pdfFileName
+            if(linkId.includes("i")){
+              //internal link
+              console.log("internal link")
+              linkId = linkId.replace('i','')
+              ipcRenderer.send('openInternalLink', linkId);
+            }else{
+              data = {
+                linkId : linkId,
+                pdfName : pdfFileName
+              }
+              ipcRenderer.send('openOtherLink', data);
             }
-            ipcRenderer.send('openOtherLink', data);
           })
         }
       });
@@ -102,6 +110,42 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
         console.log("open page "+arg)
         docViewer.setCurrentPage(arg)
       });
+
+      ipcRenderer.on('internal-link-step1', (event, arg) => {
+        //arg should be empty
+        
+        let page = docViewer.getCurrentPage();
+        let quads = docViewer.getSelectedTextQuads();
+        let text = docViewer.getSelectedText();
+        if(quads==null){
+          alert("Please select the text to link.")
+        }else{
+          data = {
+            text : text,
+            windowId : remote.getCurrentWindow().id,
+            pdfName : pdfFileName,
+            pageNumber: page,
+            quads: quads,
+            linkName: "default"
+          }
+          console.log("sth. selcted")
+          ipcRenderer.send('internal-link-step2', data);
+        }
+      });
+
+      ipcRenderer.on('internal-link-step7', (event, arg) => {
+        //arg = {
+        //  quads: data.pdf_quads,
+        //  internalLinkId: lastLinkId,
+        //}
+        console.log("linkid "+arg.internalLinkId)
+        linkid="i"+arg.internalLinkId
+        // put arg into annotation
+        highlightQuads(Annotations, annotManager,arg.quads,linkid,false)
+
+      });
+
+      
       
 
       ipcRenderer.on('updateTempLinks', (event, arg) => {
@@ -180,6 +224,7 @@ function toastMessageFeedback(message) {
 }
 
 //write all annotations from the database into the pdf
+// only pdf to pdf 
 function allAnnotationsWithLinks(Annotations, annotManager, pdfFileName){
   let selectStatement = "SELECT * from links WHERE document_name_1 LIKE '"+pdfFileName+"' OR document_data_2 LIKE '"+pdfFileName+"'";
   //let db = new sqlite3.Database('mydatabase.sqlite')
@@ -199,6 +244,27 @@ function allAnnotationsWithLinks(Annotations, annotManager, pdfFileName){
         if(row.document_name_2 == pdfFileName){
           highlightQuads(Annotations, annotManager, quads2, row.link_id)
         }
+      })
+    }
+  })
+}
+
+// same for links to editor files
+//to test
+function allEditorAnnotationsWithLinks(Annotations, annotManager, pdfFileName){
+  let selectStatement = "SELECT * from internallinks WHERE pdf_name LIKE '"+pdfFileName+"'";
+  //let db = new sqlite3.Database('mydatabase.sqlite')
+  db.all(selectStatement, function(err,rows){
+    if(err){
+      console.error("problem getting link")
+      console.error(err)
+    }else{
+      console.log("now print rows")
+      rows.forEach((row) => {
+        console.log("reihe "+row)
+        quads = JSON.parse(row.pdf_quads)
+        linkId = "i"+row.link_id
+        highlightQuads(Annotations, annotManager, quads1, row.link_id)
       })
     }
   })

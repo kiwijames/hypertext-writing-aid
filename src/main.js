@@ -12,6 +12,7 @@ const appUserPath = app.getPath("userData")
 const dbFileName = 'mydatabase.sqlite'
 const fullDbPath = pfd.join(appUserPath,dbFileName)
 var db = initDatabase(fullDbPath)
+//todo db loading with promises and global sharing
 
 let windowPDFList = []
 let idWindowMap = {}
@@ -143,6 +144,19 @@ const menu = Menu.buildFromTemplate([
         }
       }
     ]
+  },{
+    label: 'Link',
+    submenu: [
+      {
+        label: 'Put internal link',
+        accelerator: "CmdOrCtrl+i",
+        enabled: false,
+        id: 'putPdfLink',
+        click: function(menuItem, currentWindow) {
+          currentWindow.webContents.send('internal-link-step4')
+        }
+      }
+    ]
   }
 ]);
 // pdf menu
@@ -151,7 +165,7 @@ const menuPDF = Menu.buildFromTemplate([
     label: 'File',
     submenu: [
       {
-        label: 'Link selection',
+        label: 'Link selection between PDF\'s',
         accelerator: "CmdOrCtrl+l",
         click: function(menuItem, currentWindow) {
           data = {
@@ -162,6 +176,12 @@ const menuPDF = Menu.buildFromTemplate([
             if(window.id!=currentWindow.id)
               window.webContents.send('linking-message') //start linking next marked texts
           })
+        }
+      },{
+        label: 'Internal link to editor',
+        accelerator: "CmdOrCtrl+i",
+        click: function(menuItem, currentWindow) {
+          currentWindow.webContents.send('internal-link-step1')
         }
       }
     ]
@@ -221,7 +241,7 @@ app.on('ready', () => {
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
-  if(db) db.close();
+  if(global.sharedObj.database) global.sharedObj.database.close();
   // On macOS it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
   if (process.platform !== 'darwin') {
@@ -329,12 +349,81 @@ ipcMain.on('openOtherLink', (event, data) => {
   openOtherLink(data.linkId, data.pdfName)
 });
 
+ipcMain.on('internal-link-step2', (event, data) => {
+  tmpMenu = menu
+  tmpMenu.getMenuItemById('putPdfLink').enabled = true
+  origSenderId=event.sender.getOwnerBrowserWindow().id
+  data.origSenderId = origSenderId
+  console.log("origsenderid "+data.origSenderId)
+  console.log("origsenderid data "+data)
+  editorWindow.send('internal-link-step3', data)
+});
+
+ipcMain.on('internal-link-step5', (event, data) => {
+  origSenderId = data.origSenderId
+  //dataToPutInDb = {
+  //  link_name: 'tbd', 
+  //  doc_name: 'tbd',
+  //  doc_text: 'tbd', 
+  //  doc_range: 'tbd', 
+  //  pdf_name: pdfLinkData.pdfName, 
+  //  pdf_data: pdfLinkData.pageNumber, 
+  //  pdf_quads: pdfLinkData.quads, 
+  //}
+  quads_string = JSON.stringify(data.pdf_quads)
+  let insertStatement = "INSERT INTO internallinks(link_name,doc_name,\
+                          doc_text,doc_range,pdf_name,pdf_data,pdf_quads) \
+                          VALUES('"+data.link_name+"','"+data.doc_name+"','"+data.doc_text+"','"+
+                          data.doc_range+"','"+data.pdf_name+"','"+data.pdf_data+"','"+
+                          quads_string+"')"
+  
+  global.sharedObj.database.run(insertStatement, function(err){
+    if(err){
+      console.log(err)
+    } else{
+      lastLinkId = this.lastID
+      console.log("last_insert_rowid row: "+lastLinkId)
+      event.sender.webContents.send('internal-link-step6', lastLinkId)
+      data = {
+        quads: data.pdf_quads,
+        internalLinkId: lastLinkId,
+      }
+      BrowserWindow.fromId(origSenderId).webContents.send('internal-link-step7', data)
+    }
+  });
+});
+
+ipcMain.on('call-pdf-link', (event, data) => {
+  //data = linkID
+  openPdfLink(data)
+});
+
+ipcMain.on('openInternalLink', (event, data) => {
+  //data = linkID
+  editorWindow.focus()
+});
 
 ////////////////////////////database functions////////////////////////////////////////
 
+function openPdfLink(link_id){
+  let selectStatement = "SELECT * from internallinks WHERE link_id="+link_id;
+  global.sharedObj.database.all(selectStatement, function(err,rows){
+    if(err){
+      console.log(err)
+    }else{
+      rows.forEach((row) => {
+        pdf_name = rows[0].pdf_name
+        data = rows[0].pdf_data //page
+        quads = JSON.parse(rows[0].pdf_quads)
+        createPDFWindow(pdf_name,data,quads)
+      })
+    }
+  })
+}
+
 //TODO: remove hard coded function call, do with callback
 function openOtherLink(link_id, pdfName){
-  let selectStatement = "SELECT * links WHERE link_id="+link_id;
+  let selectStatement = "SELECT * from links WHERE link_id="+link_id;
   //let db = new sqlite3.Database('mydatabase.sqlite')
   if(!link_id) return;
   global.sharedObj.database.all("SELECT * FROM links WHERE link_id="+link_id+";", function(err,rows){ //only 1 row, as id unique
@@ -411,7 +500,7 @@ function deleteLinkEntryById(link_id) {
  * based on the given path and name.
  * @param  {String} fullDbPath Complete path of the sqlite3 database file
  */
-function initDatabase(fullDbPath){
+async function initDatabase(fullDbPath){
   let fullFilePath = fullDbPath
   //Creating a table automatically includes ROWID
   //document_name_X is the name of the document in which the link was set
@@ -428,6 +517,18 @@ function initDatabase(fullDbPath){
     creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\
     );'
   
+    createInternalLinkTable = 'CREATE TABLE internallinks (\
+      link_id INTEGER PRIMARY KEY AUTOINCREMENT,\
+      link_name TEXT,\
+      doc_name TEXT NOT NULL,\
+      doc_text TEXT NOT NULL,\
+      doc_range TEXT NOT NULL,\
+      pdf_name TEXT NOT NULL,\
+      pdf_data TEXT NOT NULL,\
+      pdf_quads TEXT NOT NULL,\
+      creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\
+      );'
+
   //TODO: document mapping for name-changes
 
   fs.access(fullFilePath, fs.F_OK, (err) => {
@@ -436,12 +537,15 @@ function initDatabase(fullDbPath){
       console.log("Datbase not found.")
       console.log("Datbase will be initiated found.")
       let db = new sqlite3.Database(fullFilePath)
+      global.sharedObj = {database: db}
       db.run(createLinkTable)
+      db.run(createInternalLinkTable)
       return db
     }else{
       let db = new sqlite3.Database(fullFilePath)
-      console.log("db exists: "+db)
       global.sharedObj = {database: db}
+      console.log("db exists under : "+fullFilePath)
+      console.log("db exists: "+db)
       return db
     }
   })
