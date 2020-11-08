@@ -8,11 +8,11 @@ const sqlite3 = require('sqlite3').verbose();
 
 
 const appBasePath = app.getAppPath()
+const appUserPath = app.getPath("userData")
 const dbFileName = 'mydatabase.sqlite'
-const fullDbPath = pfd.join(appBasePath,dbFileName)
-if(fs.existsSync(fullDbPath)) {
-  const db = initDatabase(fullDbPath)
-}
+const fullDbPath = pfd.join(appUserPath,dbFileName)
+var db = initDatabase(fullDbPath)
+
 let windowPDFList = []
 let idWindowMap = {}
 let editorWindow  
@@ -38,7 +38,7 @@ function createHTMLWindow (HTMLFilePath) {
 	nodeIntegration:true
 }})
   win.loadFile(HTMLFilePath)
-  // win.webContents.openDevTools()
+   win.webContents.openDevTools()
   win.on('closed', () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
@@ -206,7 +206,7 @@ app.on('ready', () => {
   if (process.platform == 'win32' && process.argv.length >= 2) {
     let openFilePath = process.argv[1];
     let fileExtension = pfd.extname(openFilePath)
-    if (openFilePath !== "" && fileExtension.toLocaleLowerCase == "pdf") {
+    if (openFilePath !== "" && openFilePath.includes("pdf")) {
       try{
         console.log(openFilePath);
         createPDFWindow(openFilePath)}
@@ -215,7 +215,7 @@ app.on('ready', () => {
       }
     }
   }
-
+  
   if(windowPDFList.length == 0) editorWindow = createHTMLWindow('public/editor.html')
 })
 
@@ -282,8 +282,8 @@ ipcMain.on('save-link', (event, data) => {
                           document_data_1,document_quads_1,document_name_2,document_data_2,document_quads_2) \
                           VALUES('"+linkData.linkName+"','"+linkData.docName1+"','"+linkData.pageNumber1+"','"+linkData.pageSelection1+"','"+linkData.docName2+"','"+linkData.pageNumber2+"','"+linkData.pageSelection2+"')"
   
-  let db = new sqlite3.Database('mydatabase.sqlite')
-  db.run(insertStatement, function(err){
+  //let db = new sqlite3.Database('mydatabase.sqlite')
+  global.sharedObj.database.run(insertStatement, function(err){
     if(err){
       console.log(err)
     }else{
@@ -335,9 +335,9 @@ ipcMain.on('openOtherLink', (event, data) => {
 //TODO: remove hard coded function call, do with callback
 function openOtherLink(link_id, pdfName){
   let selectStatement = "SELECT * links WHERE link_id="+link_id;
-  let db = new sqlite3.Database('mydatabase.sqlite')
+  //let db = new sqlite3.Database('mydatabase.sqlite')
   if(!link_id) return;
-  db.all("SELECT * FROM links WHERE link_id="+link_id+";", function(err,rows){ //only 1 row, as id unique
+  global.sharedObj.database.all("SELECT * FROM links WHERE link_id="+link_id+";", function(err,rows){ //only 1 row, as id unique
     if(err){
       console.error("problem getting link")
       console.error(err)
@@ -369,19 +369,23 @@ function openOtherLink(link_id, pdfName){
 //TODO: remove hard coded function call, do with callback
 function compareElementsFromLinkId(link_id, callback){
   let selectStatement = "SELECT * from links WHERE link_id="+link_id;
-  let db = new sqlite3.Database('mydatabase.sqlite')
+  //let db = new sqlite3.Database('mydatabase.sqlite')
   db.all(selectStatement, function(err,rows){
-    rows.forEach((row) => {
-      path1 = rows[0].document_name_1
-      path2 = rows[0].document_name_2
-      pageNumber1 = rows[0].document_data_1
-      pageNumber2 = rows[0].document_data_2
-      quadsString1 = rows[0].document_quads_1
-      quadsString2 = rows[0].document_quads_2
-      quads1 = JSON.parse(quadsString1)
-      quads2 = JSON.parse(quadsString2)
-      linklink(path1,path2,pageNumber1,pageNumber2,quads1,quads2,link_id)
-    })
+    if(err){
+      console.log(err)
+    }else{
+      rows.forEach((row) => {
+        path1 = rows[0].document_name_1
+        path2 = rows[0].document_name_2
+        pageNumber1 = rows[0].document_data_1
+        pageNumber2 = rows[0].document_data_2
+        quadsString1 = rows[0].document_quads_1
+        quadsString2 = rows[0].document_quads_2
+        quads1 = JSON.parse(quadsString1)
+        quads2 = JSON.parse(quadsString2)
+        linklink(path1,path2,pageNumber1,pageNumber2,quads1,quads2,link_id)
+      })
+    }
   })
 }
 
@@ -393,8 +397,8 @@ function compareElementsFromLinkId(link_id, callback){
  */
 function deleteLinkEntryById(link_id) {
   let deleteStatement = "DELETE FROM links WHERE link_id="+link_id;
-  let db = new sqlite3.Database(fullDbPath)
-  db.run(deleteStatement, function(err){
+  //let db = new sqlite3.Database(fullDbPath)
+  global.sharedObj.database.run(deleteStatement, function(err){
     if(err){
       console.error("problem deleting link")
       console.error(err)
@@ -431,11 +435,13 @@ function initDatabase(fullDbPath){
       console.log(err)
       console.log("Datbase not found.")
       console.log("Datbase will be initiated found.")
-      let db = new sqlite3.Database('mydatabase.sqlite')
+      let db = new sqlite3.Database(fullFilePath)
       db.run(createLinkTable)
       return db
     }else{
-      let db = new sqlite3.Database('mydatabase.sqlite')
+      let db = new sqlite3.Database(fullFilePath)
+      console.log("db exists: "+db)
+      global.sharedObj = {database: db}
       return db
     }
   })

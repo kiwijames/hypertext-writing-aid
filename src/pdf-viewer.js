@@ -4,10 +4,19 @@ console.debug("pdf-viewer.js loaded")
 var data
 const sqlite3 = require('sqlite3').verbose();
 
+const appBasePath = remote.app.getAppPath()
+const appUserPath = remote.app.getPath("userData")
+const dbFileName = 'mydatabase.sqlite'
+const fullDbPath = pfd.join(appUserPath,dbFileName)
+const db = new sqlite3.Database(fullDbPath)
+
 //Wait for pdfFile to be given
 ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads, link_id) => {
-  var appBasePath = remote.app.getAppPath()
   var pdfFilePath = pfd.resolve(pdfFile)
+  
+
+
+
   // putting vars into debug log
     console.debug("baseBath: "+appBasePath)
     console.debug("linkid: "+link_id)
@@ -173,7 +182,7 @@ function toastMessageFeedback(message) {
 //write all annotations from the database into the pdf
 function allAnnotationsWithLinks(Annotations, annotManager, pdfFileName){
   let selectStatement = "SELECT * from links WHERE document_name_1 LIKE '"+pdfFileName+"' OR document_data_2 LIKE '"+pdfFileName+"'";
-  let db = new sqlite3.Database('mydatabase.sqlite')
+  //let db = new sqlite3.Database('mydatabase.sqlite')
   db.all(selectStatement, function(err,rows){
     if(err){
       console.error("problem getting link")
