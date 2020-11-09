@@ -195,6 +195,52 @@ const menuPDF = Menu.buildFromTemplate([
   {
     label: 'File',
     submenu: [
+    {
+        label: 'Open PDF(s)',
+        accelerator: "CmdOrCtrl+o",
+        click: function() {
+          filePaths = dialog.showOpenDialog({ 
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+              { name: "PDF", extensions: ["pdf"] },
+              { name: "All Files", extensions: ["*"] }
+            ]
+          })
+          if(filePaths) filePaths.forEach( (path) => { createPDFWindow(path); })
+        }
+    }, 
+    {
+      label: 'New Text Edtior',
+      accelerator: "CmdOrCtrl+n",
+      click: function() {
+        createHTMLWindow('public/editor.html')          
+      }
+    },
+    {
+      label: 'Close All',
+      click: function() {
+        app.quit()
+      }
+    }
+  ]},{
+    label: 'View',
+    submenu: [
+      {
+        label: 'View PDF Links',
+        click: function() {
+          createHTMLWindow('public/linked-list.html')
+        }
+      },
+      {
+        label: 'View Internal Links',
+        click: function() {
+          createHTMLWindow('public/internal-linked-list.html') 
+        }
+      }
+    ]
+  }, {
+    label: 'Link',
+    submenu: [
       {
         label: 'Link selection between PDF\'s',
         accelerator: "CmdOrCtrl+l",
@@ -453,6 +499,7 @@ ipcMain.on('internal-link-step5', (event, data) => {
 
 ipcMain.on('call-pdf-link', (event, data) => {
   //data = linkID
+  
   openPdfLink(data)
 });
 
@@ -541,7 +588,10 @@ function openPdfLink(link_id){
         pdf_name = rows[0].pdf_name
         data = rows[0].pdf_data //page
         quads = JSON.parse(rows[0].pdf_quads)
-        createPDFWindow(pdf_name,data,quads)
+
+        
+        if(windowPDFList[pdf_name]) windowPDFList[pdf_name].focus() //only works with promise, as sqlite3 async
+        else createPDFWindow(pdf_name,data,quads)
       })
     }
   })
