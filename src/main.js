@@ -44,7 +44,7 @@ function createHTMLWindow(HTMLFilePath, doc_path='') {
     }
   })
   win.loadFile(HTMLFilePath)
-  win.webContents.openDevTools()
+  //win.webContents.openDevTools()
   win.on('close', () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
@@ -90,7 +90,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
   // Uncomment DevTools for debugging
-  contents.openDevTools()
+  //contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
@@ -161,9 +161,15 @@ const menu = Menu.buildFromTemplate([
     label: 'View',
     submenu: [
       {
-        label: 'View Links',
+        label: 'View PDF Links',
         click: function() {
           createHTMLWindow('public/linked-list.html')
+        }
+      },
+      {
+        label: 'View Internal Links',
+        click: function() {
+          createHTMLWindow('public/internal-linked-list.html') 
         }
       }
     ]
@@ -380,6 +386,11 @@ ipcMain.on('deleteLink', (event, arg) => {
   console.log(arg)
   deleteLinkEntryById(arg)
 });
+ipcMain.on('deleteInternalLink', (event, arg) => {
+  console.log(arg)
+  deleteInternalLinkEntryById(arg)
+});
+
 
 ipcMain.on('call-linked-links', (event, arg) => {
   //arg = link_id
@@ -609,6 +620,19 @@ function deleteLinkEntryById(link_id) {
     } else console.debug("deleted link with id"+link_id)
   });
 }
+
+function deleteInternalLinkEntryById(link_id) {
+  let deleteStatement = "DELETE FROM internallinks WHERE link_id="+link_id;
+  //let db = new sqlite3.Database(fullDbPath)
+  global.sharedObj.database.run(deleteStatement, function(err){
+    if(err){
+      console.error("problem deleting link")
+      console.error(err)
+    } else console.debug("deleted link with id"+link_id)
+  });
+}
+
+
 
 /**
  * Creates a database with the default schema,
