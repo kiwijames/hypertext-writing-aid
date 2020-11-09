@@ -3,9 +3,11 @@ const fs = require('fs')
 const pfd = require('path');
 const sqlite3 = require('sqlite3').verbose();
 
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
-
+// one instance only
+const gotTheLock = app.requestSingleInstanceLock()
+if(!gotTheLock) {
+  app.quit()
+}
 
 const appBasePath = app.getAppPath()
 const appUserPath = app.getPath("userData")
@@ -15,8 +17,8 @@ var db = initDatabase(fullDbPath)
 //todo db loading with promises and global sharing
 
 let windowPDFList = []
-let idWindowMap = {} //replace with general search for window id mapping
-//BrowserWindow.fromId(origSenderId)
+let idWindowMap = {} //path to win - win mapping
+let idEditorMap = {} //path to win - win mapping
 let windowEditorList = []
 let editorWindow  
 
@@ -55,8 +57,10 @@ function createHTMLWindow(HTMLFilePath, doc_path='') {
     if(doc_path!=''){
       console.log("did-finish-load "+doc_path)
       win.send('loadText', doc_path)
+      idEditorMap[HTMLFilePath] = null
     }
   })
+  idWindowMap[HTMLFilePath] = win
   windowEditorList.push(win)
   return win
 }
@@ -241,13 +245,9 @@ function linklink(pdfPath1,pdfPath2,pageNumber1=1,pageNumber2=1,quads1,quads2, l
 ////////////////////////////app event handeling////////////////////////////////////////
 
 // Create main window when ready
-app.on('ready', () => {
-
-
-
-  // If app is opend on windows by opening a file 
-  if (process.platform == 'win32' && process.argv.length >= 2) {
-    let openFilePath = process.argv[1];
+app.on('second-instance', (event, commandLine, workingDirectory) => {
+  if (process.platform == 'win32' && commandLine.length >= 2) {
+    let openFilePath = commandLine[1];
     let fileExtension = pfd.extname(openFilePath)
     if (openFilePath !== "" && openFilePath.includes("pdf")) {
       try{
@@ -257,9 +257,28 @@ app.on('ready', () => {
         dialog.showErrorBox("opening pdf problem", e + " und datei: "+openFilePath)
       }
     }
+  }else {
+    createHTMLWindow('public/editor.html')
   }
+})
+
+app.on('ready', () => {
   
-  if(windowPDFList.length == 0) editorWindow = createHTMLWindow('public/editor.html')
+    // If app is opend on windows by opening a file 
+    if (process.platform == 'win32' && process.argv.length >= 2) {
+      let openFilePath = process.argv[1];
+      let fileExtension = pfd.extname(openFilePath)
+      if (openFilePath !== "" && openFilePath.includes("pdf")) {
+        try{
+          console.log(openFilePath);
+          createPDFWindow(openFilePath)}
+        catch(e){
+          dialog.showErrorBox("opening pdf problem", e + " und datei: "+openFilePath)
+        }
+      }
+    }
+    
+    if(windowPDFList.length == 0) editorWindow = createHTMLWindow('public/editor.html')
 })
 
 // Quit when all windows are closed.
@@ -460,7 +479,8 @@ function getInternalLinkDocPath(link_id) {
       rows.forEach((row) => {
         doc_path = rows[0].doc_name
         console.log("returning do path "+doc_path)
-        createHTMLWindow('public/editor.html',doc_path)
+        if(idEditorMap[doc_path]) idEditorMap[doc_path].focus()
+        else createHTMLWindow('public/editor.html',doc_path)
         return doc_path
       })
     }
