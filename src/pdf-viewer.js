@@ -50,6 +50,7 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
       // Highlight link if given
       if(quads) highlightQuads(Annotations, annotManager, quads, link_id)
       allAnnotationsWithLinks(Annotations, annotManager, pdfFileName)
+      allEditorAnnotationsWithLinks(Annotations, annotManager, pdfFileName)
 
       // Message received when wanting to create a link
       ipcRenderer.on('linking-message', (event, arg) => {
@@ -77,12 +78,18 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
           //let user choose
           annoList.forEach(annot =>{
             //check if i is in linkId
-            let linkId = annot.getCustomData('linkId')
+            let linkId = ""+annot.getCustomData('linkId')
+            console.log("link id double clicked: "+linkId)
             if(linkId.includes("i")){
               //internal link
               console.log("internal link")
               linkId = linkId.replace('i','')
               ipcRenderer.send('openInternalLink', linkId);
+            } else if(linkId.includes("e")){
+              //internal link
+              console.log("editor link")
+              linkId = linkId.replace('e','')
+              ipcRenderer.send('openEditorLink', linkId);
             }else{
               data = {
                 linkId : linkId,
@@ -137,9 +144,11 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
         //arg = {
         //  quads: data.pdf_quads,
         //  internalLinkId: lastLinkId,
+        //  editorWindowId: editorWindowId
         //}
-        console.log("linkid "+arg.internalLinkId)
-        linkid="i"+arg.internalLinkId
+        console.log(arg)
+        console.log("linkid "+arg.editorWindowId)
+        linkid="e"+arg.editorWindowId
         // put arg into annotation
         highlightQuads(Annotations, annotManager,arg.quads,linkid,false)
 
@@ -250,7 +259,7 @@ function allAnnotationsWithLinks(Annotations, annotManager, pdfFileName){
 }
 
 // same for links to editor files
-//to test
+// internal links to editor
 function allEditorAnnotationsWithLinks(Annotations, annotManager, pdfFileName){
   let selectStatement = "SELECT * from internallinks WHERE pdf_name LIKE '"+pdfFileName+"'";
   //let db = new sqlite3.Database('mydatabase.sqlite')
@@ -264,7 +273,7 @@ function allEditorAnnotationsWithLinks(Annotations, annotManager, pdfFileName){
         console.log("reihe "+row)
         quads = JSON.parse(row.pdf_quads)
         linkId = "i"+row.link_id
-        highlightQuads(Annotations, annotManager, quads1, row.link_id)
+        highlightQuads(Annotations, annotManager, quads, linkId)
       })
     }
   })

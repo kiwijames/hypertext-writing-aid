@@ -15,7 +15,9 @@ var db = initDatabase(fullDbPath)
 //todo db loading with promises and global sharing
 
 let windowPDFList = []
-let idWindowMap = {}
+let idWindowMap = {} //replace with general search for window id mapping
+//BrowserWindow.fromId(origSenderId)
+let windowEditorList = []
 let editorWindow  
 
 
@@ -28,24 +30,34 @@ let editorWindow
  * @param  {String} HTMLFilePath Absolute path to a PDF file.
  * @return {BrowserWindow} Window with the PDF in a Viewer.
  */
-function createHTMLWindow (HTMLFilePath) {
+function createHTMLWindow(HTMLFilePath, doc_path='') {
   // Create the browser window.
   let win = new BrowserWindow({ 
-  width: 630, 
-  minWidth:630,
-  maxWidth:630,
-	height: 440 ,
-	webPreferences: {
-	nodeIntegration:true
-}})
+    width: 630, 
+    minWidth:630,
+    maxWidth:630,
+    height: 440 ,
+    webPreferences: {
+      nodeIntegration:true
+    }
+  })
   win.loadFile(HTMLFilePath)
-   win.webContents.openDevTools()
-  win.on('closed', () => {
+  win.webContents.openDevTools()
+  win.on('close', () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
+    windowEditorList = windowEditorList.filter(w => w.id !== win.id)
     win = null
   })
+  win.webContents.on('did-finish-load', () => {
+    console.log("did-finish-load "+doc_path)
+    if(doc_path!=''){
+      console.log("did-finish-load "+doc_path)
+      win.send('loadText', doc_path)
+    }
+  })
+  windowEditorList.push(win)
   return win
 }
 
@@ -106,9 +118,15 @@ const menu = Menu.buildFromTemplate([
           }
       }, 
       {
-        label: 'Import Text',
-        accelerator: "CmdOrCtrl+i",
+        label: 'New Text Edtior',
+        accelerator: "CmdOrCtrl+n",
         click: function() {
+          createHTMLWindow('public/editor.html')          
+        }
+      }, 
+      {
+        label: 'Import Text',
+        click: function(menuItem, currentWindow) {
           path = dialog.showOpenDialog({ 
             properties: ['openFile'] ,
             filters: [
@@ -116,15 +134,16 @@ const menu = Menu.buildFromTemplate([
               { name: "All Files", extensions: ["*"] }
               ]
             })
-          if(path) editorWindow.webContents.send('loadText',path[0])
+          if(path) currentWindow.send('loadText',path[0])
         }
-      }, 
+      },
       {
         label: 'Save As',
         accelerator: "CmdOrCtrl+Shift+s",
-        click: function() {
+        click: function(menuItem, currentWindow) {
           let path = dialog.showSaveDialog()
-          if(path) editorWindow.webContents.send('saveTextAsHTML',path)
+          if(path) currentWindow.send('saveTextAsHTML',path)
+          // save in database the file location for now
         }
       },
       {
@@ -154,6 +173,8 @@ const menu = Menu.buildFromTemplate([
         id: 'putPdfLink',
         click: function(menuItem, currentWindow) {
           currentWindow.webContents.send('internal-link-step4')
+          windowEditorList.filter(w => w.id == currentWindow.id).forEach(w => w.send('internal-link-step4',true)) //arg given indicate to stop other events
+          menuItem.enabled = false
         }
       }
     ]
@@ -222,6 +243,8 @@ function linklink(pdfPath1,pdfPath2,pageNumber1=1,pageNumber2=1,quads1,quads2, l
 // Create main window when ready
 app.on('ready', () => {
 
+
+
   // If app is opend on windows by opening a file 
   if (process.platform == 'win32' && process.argv.length >= 2) {
     let openFilePath = process.argv[1];
@@ -241,6 +264,9 @@ app.on('ready', () => {
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
+    // check table if dead internal links exist
+    deleteUnsavedInternalLinks()
+
   if(global.sharedObj.database) global.sharedObj.database.close();
   // On macOS it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
@@ -356,11 +382,12 @@ ipcMain.on('internal-link-step2', (event, data) => {
   data.origSenderId = origSenderId
   console.log("origsenderid "+data.origSenderId)
   console.log("origsenderid data "+data)
-  editorWindow.send('internal-link-step3', data)
+  windowEditorList.forEach(w => w.send('internal-link-step3', data)) //But how to stop broadcast
 });
 
 ipcMain.on('internal-link-step5', (event, data) => {
   origSenderId = data.origSenderId
+  editorWindowId = data.editorWindowId
   //dataToPutInDb = {
   //  link_name: 'tbd', 
   //  doc_name: 'tbd',
@@ -387,6 +414,7 @@ ipcMain.on('internal-link-step5', (event, data) => {
       data = {
         quads: data.pdf_quads,
         internalLinkId: lastLinkId,
+        editorWindowId: editorWindowId,
       }
       BrowserWindow.fromId(origSenderId).webContents.send('internal-link-step7', data)
     }
@@ -400,10 +428,77 @@ ipcMain.on('call-pdf-link', (event, data) => {
 
 ipcMain.on('openInternalLink', (event, data) => {
   //data = linkID
-  editorWindow.focus()
+  console.log("need to open editor with text with id "+data)
+  //todo, open editor with saved text
+  doc_path = getInternalLinkDocPath(data)
+  console.log("docPath: "+doc_path)
+  //todo with await and promises
+  //createHTMLWindow('public/editor.html',doc_path)
+});
+
+ipcMain.on('openEditorLink', (event, data) => {
+  //data = windowID
+  console.log("window id that gets focus:"+data)
+  //BrowserWindow.fromId(data).focus() //not working!
+  windowEditorList.filter(w => w.id !== data).pop().focus()
+});
+
+ipcMain.on('saveTextAsHTML-step2',(event, data) => {
+  //data = file path and internalLinkIdList
+  console.log("internallink id list? "+data.internalLinkIdList)
+  putPathForInternalIds(data.internalLinkIdList, data.filepath)
+  //update links in pdf-viewers
 });
 
 ////////////////////////////database functions////////////////////////////////////////
+function getInternalLinkDocPath(link_id) {
+  let selectStatement = "Select doc_name from internallinks WHERE link_id="+link_id;
+  global.sharedObj.database.all(selectStatement, function(err,rows){
+    if(err){
+      console.log(err)
+    }else{
+      rows.forEach((row) => {
+        doc_path = rows[0].doc_name
+        console.log("returning do path "+doc_path)
+        createHTMLWindow('public/editor.html',doc_path)
+        return doc_path
+      })
+    }
+  })
+
+}
+
+function deleteUnsavedInternalLinks() {
+  let deleteStatement = "DELETE FROM internallinks WHERE doc_name='tbd'";
+  global.sharedObj.database.run(deleteStatement, function(err){
+    if(err){
+      console.error("problem deleting internallink")
+      console.error(err)
+    } else console.debug("deleted internallinks with doc_name tbd")
+  });
+}
+
+
+
+function putPathForInternalIds(internalLinkIdList, path){
+  console.log("internallink id list? "+internalLinkIdList)
+  internalLinkIdList.forEach(id=>putPathForInternalId(id,path))
+}
+
+function putPathForInternalId(internalLinkId, path){
+  let insertStatement = "UPDATE internallinks SET doc_name='"+path+"' WHERE link_id="+internalLinkId
+
+  global.sharedObj.database.run(insertStatement, function(err){
+    if(err){
+      console.log(err)
+      console.log("PROBLEM internal link with id "+internalLinkId)
+      return false
+    }else{
+      console.log("inserted internal link with id "+internalLinkId)
+      return true
+    }
+  });
+}
 
 function openPdfLink(link_id){
   let selectStatement = "SELECT * from internallinks WHERE link_id="+link_id;

@@ -1,16 +1,35 @@
 const { ipcRenderer, remote, dialog, ipcMain } = require('electron');
-const fs = require('fs')
+const fs = require('fs');
+const { send } = require('process');
 
 ipcRenderer.on('saveTextAsHTML', (event, data) => {
-    let filepath = data + ".html"
+    let filepath = data// + ".html"
     let content = document.getElementById('textBox').innerHTML
+    let anchors = Array.from(document.getElementById('textBox').getElementsByTagName('a'))
+    let internalLinkIdList = []
+    anchors.forEach(x => {
+        onclickfuntion = x.getAttribute('onclick')
+        if(onclickfuntion.includes('callinternalLink')) {
+            internaLlinkId = onclickfuntion.split('(')[1].split(')')[0]
+        }
+        internalLinkIdList.push(internaLlinkId)
+    })
+
     fs.writeFile(filepath, content, (err) => {
         if (err) {
             alert("An error ocurred updating the file" + err.message);
             console.log(err);
-            return;
+        }else{
+            newData = {
+                filepath:data,
+                internalLinkIdList:internalLinkIdList
+            }
+            console.log("internalLinkIdList: "+internalLinkIdList)
+            console.log("internalLinkIdList: "+newData.internalLinkIdList)
+            ipcRenderer.send('saveTextAsHTML-step2',newData)
+            alert("The file has been succesfully saved");
+        
         }
-        alert("The file has been succesfully saved");
     });
 });
 
@@ -29,7 +48,9 @@ ipcRenderer.on('loadText', (event, data) => {
 ipcRenderer.on('internal-link-step3', (event, data) => { 
     //origSender = pdf window that sent the link, now return link
     origSenderId = data.origSenderId
-    ipcRenderer.on('internal-link-step4', (event) => {  
+    ipcRenderer.on('internal-link-step4', (event, arg) => {  
+        if(arg) return
+        console.log("after return")
         //data = {
         //  text : text,
         //  windowId : remote.getCurrentWindow().id,
@@ -59,6 +80,8 @@ ipcRenderer.on('internal-link-step3', (event, data) => {
                 pdf_quads: pdfLinkData.quads, 
             }
             dataToPutInDb.origSenderId = origSenderId
+            dataToPutInDb.editorWindowId = remote.getCurrentWindow().id
+            console.log("current window id: "+dataToPutInDb.editorWindowId)
             ipcRenderer.send('internal-link-step5',dataToPutInDb)
             //TODO: store link data and give function link to anchor in text
             
@@ -150,3 +173,18 @@ function callLinkedLinks(linkID){
 function callinternalLink(linkID){
     ipcRenderer.send('call-pdf-link',linkID);
 }
+
+
+////////////////////////////////////Window Event Handeling//////////////////////////////////////////////////
+
+//DOESNT WORK
+//win.once('did-finish-load',()=>{
+//    console.log("finish loading")
+//    win.addEventListener('beforeunload', (e) => {
+//        e.returnValue  =true;
+//        var answer = confirm('Do you reallz want to close the window?')
+//        
+//        console.log("choice: "+answer)
+//        if(answer) win.destroy()
+//    })
+//})
