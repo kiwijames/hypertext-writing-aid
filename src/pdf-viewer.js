@@ -1,5 +1,5 @@
 const {ipcRenderer, remote, app} = require('electron');
-const pfd = require('path');
+const path = require('path');
 console.debug("pdf-viewer.js loaded")
 var data
 const sqlite3 = require('sqlite3').verbose();
@@ -7,7 +7,7 @@ const sqlite3 = require('sqlite3').verbose();
 const appBasePath = remote.app.getAppPath()
 const appUserPath = remote.app.getPath("userData")
 const dbFileName = 'mydatabase.sqlite'
-const fullDbPath = pfd.join(appUserPath,dbFileName)
+const fullDbPath = path.join(appUserPath,dbFileName)
 const db = new sqlite3.Database(fullDbPath)
 
 //Wait for pdfFile to be given

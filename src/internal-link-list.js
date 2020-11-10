@@ -1,14 +1,14 @@
 const { ipcRenderer, remote } = require('electron');
 const Tabulator = require('tabulator-tables');
 const fs = require('fs')
-const pfd = require('path')
+const path = require('path')
 const sqlite3 = require('sqlite3').verbose();
 
 
 const appBasePath = remote.app.getAppPath()
 const appUserPath = remote.app.getPath("userData")
 const dbFileName = 'mydatabase.sqlite'
-const fullDbPath = pfd.join(appUserPath,dbFileName)
+const fullDbPath = path.join(appUserPath,dbFileName)
 console.log(fullDbPath)
 const db = new sqlite3.Database(fullDbPath)
 var tabledata = []

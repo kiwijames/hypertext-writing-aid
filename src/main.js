@@ -1,6 +1,6 @@
 const { app, BrowserWindow, webContents, ipcMain, dialog, Menu } = require('electron')
 const fs = require('fs')
-const pfd = require('path');
+const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 
 // one instance only
@@ -12,7 +12,7 @@ if(!gotTheLock) {
 const appBasePath = app.getAppPath()
 const appUserPath = app.getPath("userData")
 const dbFileName = 'mydatabase.sqlite'
-const fullDbPath = pfd.join(appUserPath,dbFileName)
+const fullDbPath = path.join(appUserPath,dbFileName)
 var db = initDatabase(fullDbPath)
 //todo db loading with promises and global sharing
 
@@ -81,7 +81,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
       nodeIntegration:true,
       webSecurity: false
   }});
-  win.setTitle(pfd.basename(pdfFilePath))
+  win.setTitle(path.basename(pdfFilePath))
   win.setMenu(menuPDF)
   //win.setMenuBarVisibility(false)
   win.loadFile('public/template.html')
@@ -118,7 +118,7 @@ const menu = Menu.buildFromTemplate([
                 { name: "All Files", extensions: ["*"] }
               ]
             })
-            if(filePaths) filePaths.forEach( (path) => { createPDFWindow(path); })
+            if(filePaths) filePaths.forEach( (filePath) => { createPDFWindow(filePath); })
           }
       }, 
       {
@@ -131,22 +131,22 @@ const menu = Menu.buildFromTemplate([
       {
         label: 'Import Text',
         click: function(menuItem, currentWindow) {
-          path = dialog.showOpenDialog({ 
+          filePath = dialog.showOpenDialog({ 
             properties: ['openFile'] ,
             filters: [
               { name: "HTML", extensions: ["html", "htm"] },
               { name: "All Files", extensions: ["*"] }
               ]
             })
-          if(path) currentWindow.send('loadText',path[0])
+          if(filePath) currentWindow.send('loadText',filePath[0])
         }
       },
       {
         label: 'Save As',
         accelerator: "CmdOrCtrl+Shift+s",
         click: function(menuItem, currentWindow) {
-          let path = dialog.showSaveDialog()
-          if(path) currentWindow.send('saveTextAsHTML',path)
+          let filePath = dialog.showSaveDialog()
+          if(filePath) currentWindow.send('saveTextAsHTML',filePath)
           // save in database the file location for now
         }
       },
@@ -300,7 +300,7 @@ function linklink(pdfPath1,pdfPath2,pageNumber1=1,pageNumber2=1,quads1,quads2, l
 app.on('second-instance', (event, commandLine, workingDirectory) => {
   if (process.platform == 'win32' && commandLine.length >= 2) {
     let openFilePath = commandLine[1];
-    let fileExtension = pfd.extname(openFilePath)
+    let fileExtension = path.extname(openFilePath)
     if (openFilePath !== "" && openFilePath.includes("pdf")) {
       try{
         console.log(openFilePath);
@@ -319,7 +319,7 @@ app.on('ready', () => {
     // If app is opend on windows by opening a file 
     if (process.platform == 'win32' && process.argv.length >= 2) {
       let openFilePath = process.argv[1];
-      let fileExtension = pfd.extname(openFilePath)
+      let fileExtension = path.extname(openFilePath)
       if (openFilePath !== "" && openFilePath.includes("pdf")) {
         try{
           console.log(openFilePath);
@@ -558,13 +558,13 @@ function deleteUnsavedInternalLinks() {
 
 
 
-function putPathForInternalIds(internalLinkIdList, path){
+function putPathForInternalIds(internalLinkIdList, filePath){
   console.log("internallink id list? "+internalLinkIdList)
-  internalLinkIdList.forEach(id=>putPathForInternalId(id,path))
+  internalLinkIdList.forEach(id=>putPathForInternalId(id,filePath))
 }
 
-function putPathForInternalId(internalLinkId, path){
-  let insertStatement = "UPDATE internallinks SET doc_name='"+path+"' WHERE link_id="+internalLinkId
+function putPathForInternalId(internalLinkId, filePath){
+  let insertStatement = "UPDATE internallinks SET doc_name='"+filePath+"' WHERE link_id="+internalLinkId
 
   global.sharedObj.database.run(insertStatement, function(err){
     if(err){
