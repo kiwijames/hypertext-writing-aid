@@ -2,7 +2,7 @@
   "name": "Hypertext-Writing-Aid",
   "version": "1.0.0",
   "description": "Master thesis prototype demonstrating the possiblities of hypertext as a writing aid for scientific thesis",
-  "main": "./src/main.js",
+  "main": "./src/main2.js",
   "scripts": {
     "start": "electron .",
     "postinstall": "install-app-deps",

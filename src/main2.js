@@ -2,6 +2,7 @@ const { app, BrowserWindow, webContents, ipcMain, dialog, Menu } = require('elec
 const fs = require('fs')
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
+const Database = require('./database.js')
 
 // one instance only
 const gotTheLock = app.requestSingleInstanceLock()
@@ -11,9 +12,10 @@ if(!gotTheLock) {
 
 const appBasePath = app.getAppPath()
 const appUserPath = app.getPath("userData")
-const dbFileName = 'mydatabase.sqlite_old'
+const dbFileName = 'mydatabase.sqlite'
 const fullDbPath = path.join(appUserPath,dbFileName)
-var db = initDatabase(fullDbPath)
+var db = new Database(appUserPath,dbFileName)
+global.sharedObj = {db: db}
 //todo db loading with promises and global sharing
 
 let windowPDFList = []
@@ -44,7 +46,7 @@ function createHTMLWindow(HTMLFilePath, doc_path='') {
     }
   })
   win.loadFile(HTMLFilePath)
-  //win.webContents.openDevTools()
+  win.webContents.openDevTools()
   win.on('close', () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
@@ -90,7 +92,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
   // Uncomment DevTools for debugging
-  //contents.openDevTools()
+  contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
@@ -249,10 +251,18 @@ const menuPDF = Menu.buildFromTemplate([
             toast: true
           }
           currentWindow.webContents.send('linking-message',data)
+          currentWindow.webContents.send('pdf-link-step1',data)
           windowPDFList.map(window => {
             if(window.id!=currentWindow.id)
               window.webContents.send('linking-message') //start linking next marked texts
           })
+        }
+      },{
+        label: 'Finish link between PDF\'s',
+        enabled: false,
+        id: 'finishPdfLink',
+        click: function(menuItem, currentWindow) {
+            currentWindow.webContents.send('pdf-link-step4')
         }
       },{
         label: 'Internal link to editor',
@@ -336,14 +346,16 @@ app.on('ready', () => {
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
     // check table if dead internal links exist
-    deleteUnsavedInternalLinks()
+    //deleteUnsavedInternalLinks()
+    db.closeDatabase()
+    //if(global.sharedObj.database) global.sharedObj.database.close();
 
-  if(global.sharedObj.database) global.sharedObj.database.close();
-  // On macOS it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+
+    // On macOS it is common for applications and their menu bar
+    // to stay active until the user quits explicitly with Cmd + Q
+    if (process.platform !== 'darwin') {
+        app.quit()
+    }
 })
 
 ////////////////////////////message handeling////////////////////////////////////////
@@ -359,39 +371,40 @@ let linkData = {
   pageSelection2: ""
 }
 
-ipcMain.on('linking-answer', (event, arg) => {
-  //arg looks like this:
-  // data = {
-  //   text : docViewer.getSelectedText(),
-  //   windowId : remote.getCurrentWindow().id,
-  //   pdfName : pdfFileName,
-  //   pageNumber: docViewer.getCurrentPage(),
-  //   quads: allQuads
-  // }
-  console.log("link counter: "+linkingCounter)
-  if(linkingCounter==0){
-    linkData.docName1 = arg.pdfName
-    linkData.pageNumber1 = arg.pageNumber
-    quadString = JSON.stringify(arg.quads)
-    linkData.pageSelection1 = quadString
-    data = { toast: true }
-    event.sender.send('firstLinkReceived', data)
-    linkingCounter++
-  }else if (linkingCounter==1) {
-    linkData.docName2 = arg.pdfName
-    linkData.pageNumber2 = arg.pageNumber
-    quadString = JSON.stringify(arg.quads)
-    linkData.pageSelection2 = quadString
-    data = { toast: true }
-    event.sender.send('secondLinkReceived', data)
-    linkingCounter++
-  }
-  if (linkingCounter==2) {
-    linkingCounter=0;
-  }
-  // Return some data to the renderer process with the mainprocess-response ID
-  //event.sender.send('mainprocess-response', "Hello World!");
+ipcMain.on('pdf-link-step2', (event, data) => {
+    console.log("pdf-link-step2 " + data)
+    menuPDF.getMenuItemById('finishPdfLink').enabled = true
+    event.sender.webContents.send('pdf-link-step3',data)
 });
+
+ipcMain.on('pdf-link-step5', (event, data) => {
+    let anchorList = data
+    anchorList[0].$pdf_quads = JSON.stringify(anchorList[0].$pdf_quads)
+    anchorList[1].$pdf_quads = JSON.stringify(anchorList[1].$pdf_quads)
+    db.createAnchor(anchorList[0]).then( result => {
+        let anchor_id_1 = result
+        db.createAnchor(anchorList[1]).then( result => {
+            let anchor_id_2 = result
+            let link = {
+                $link_name: "default",
+                $link_description: "default",
+                $anchor_id_1: anchor_id_1,
+                $anchor_id_2: anchor_id_2
+            }
+            console.log("creating link with anchor id 1 =  "+link.$anchor_id_1)
+            console.log("creating link with anchor id 2 =  "+link.$anchor_id_2)
+            db.createLink(link).then( result => {
+                let link_id = result
+                console.log("created link successfully id "+link_id)
+            })
+        })
+    })
+    
+    console.log(data)
+    
+});
+
+
 
 ipcMain.on('save-link', (event, data) => {
   linkData.linkName = data.linkName
@@ -452,8 +465,7 @@ ipcMain.on('openOtherLink', (event, data) => {
 });
 
 ipcMain.on('internal-link-step2', (event, data) => {
-  tmpMenu = menu
-  tmpMenu.getMenuItemById('putPdfLink').enabled = true
+  menu.getMenuItemById('putPdfLink').enabled = true
   origSenderId=event.sender.getOwnerBrowserWindow().id
   data.origSenderId = origSenderId
   console.log("origsenderid "+data.origSenderId)

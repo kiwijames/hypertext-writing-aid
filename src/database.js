@@ -3,10 +3,10 @@ const path = require('path');
 const fs = require('fs')
 
 
-class Database {
+module.exports = class Database {
     constructor(db_path, db_name) {
         const fullDbPath = path.join(db_path,db_name)
-        this.db = initDatabase(fullDbPath)
+        this.db = this.initDatabase(fullDbPath)
     }
 
     /**
@@ -14,33 +14,98 @@ class Database {
      * @param  {String} fullDbPath Complete path of the sqlite3 database file
      * @return  {sqlite3.Database} sqlite3 database object
      */
-    initDatabase(fullDbPath) {
-        if(fs.existsSync('fullFilePath')){
-            consloge.debug("Found database at: "+fullFilePath)
-            let db = new sqlite3.Database(fullFilePath, (err) => {
-                if(err) return null
-                return db
+    initDatabase(fullFilePath) {
+        if(fs.existsSync(fullFilePath)){
+            console.debug("Found database at: "+fullFilePath)
+            return new sqlite3.Database(fullFilePath, (err) => {
+                if(err) console.debug("Error creating database: "+err)
             })
         }else{
-            console.debug("Existing database not found, initianting new one.")
+            console.debug("Existing database not found at "+fullFilePath+", initianting new one.")
             let db = new sqlite3.Database(fullFilePath, (err) => {
-                if(er) return null
-                db.exec(createLinkObjectTable)
-                    .exec(createLinkingTable)
-                    .exec(createAnchorTable, (err) => {
-                        if(err) {
-                            console.error("Error creating the tables.")
-                            db.close((err)=>{
-                                fs.unlinkSync(fullFilePath)
-                                console.error("Deleted the table.")
-                                return null
-                            })
-                        }
-                        return db
-                    })
+                if(err) console.debug("There might be a problem with the database.")
+                else {
+                db.exec(createLinkTable)
+                .exec(createAnchorTable, (err) => {
+                    console.debug("create table executed")
+                    if(err) {
+                        console.error("Error creating the tables." + err)
+                        db.close((err)=>{
+                            fs.unlinkSync(fullFilePath)
+                            console.error("Deleted the table.")
+                        })
+                    }
+                })
+                }
             })
+            return db
         }
     }
+
+    closeDatabase() {
+        this.db.close()
+    }
+
+
+
+    /**
+    * Returns a promise returning an error or the id of the new link
+    * @param  {Object} link corresponds to the database object
+    */
+   createLink(link){
+    return new Promise((resolve,reject) => {
+        this.db.run("INSERT INTO link(link_name,link_description,anchor_id_1,anchor_id_2) \
+        VALUES($link_name,$link_description,$anchor_id_1,$anchor_id_2)", link, function (err) {
+            if(err) {
+                console.log(err)
+                reject(err)
+            }
+            else resolve(this.lastID)
+        })
+    })
+}
+
+
+    /**
+    * Returns a promise returning an error or the id of the new anchor
+    * @param  {Object} anchor corresponds to the database object
+    */
+    createAnchor(anchor){
+        console.log("putting anchor into table")
+        return new Promise((resolve,reject) => {
+            this.db.run("INSERT INTO 'anchor' (doc_name,  doc_path,  file_type,  anchor_text,  pdf_quads,  pdf_page,  doc_position) \
+                                     VALUES ($doc_name, $doc_path, $file_type, $anchor_text, $pdf_quads, $pdf_page, $doc_position)", 
+            anchor, function (err) {
+                if(err) {
+                    console.log(err)
+                    reject(err)
+                }
+                else resolve(this.lastID)
+                
+            })
+        })
+    }
+
+
+
+    /**
+    * Returns a promise returning all anchor objects associated with a document name.
+    * @param  {String} doc_name name of the document
+    * @return  {[Object]} list of sqlite3 database objects
+    */
+    getAllAnchorsForDoc(doc_name){
+        return new Promise((resolve,reject) => {
+            this.db.all("SELECT * FROM anchor WHERE anchor.doc_name = ?",
+                        doc_name, (err,rows) => {
+                if(err) {
+                    console.log(err)
+                    reject(err)
+                }
+                else resolve(rows)
+            })
+        })
+    }
+
 
     /**
      * Returns a promise given a link_id and anchor_id the other corresponding anchor is given.
@@ -121,29 +186,27 @@ class Database {
 
 
 /////////////////////////////////////////////Database Schema/////////////////////////////////////////////
-const createLinkingTable = 'CREATE TABLE linking (\
-    linking_id INTEGER PRIMARY KEY AUTOINCREMENT,\
-    FOREIGN KEY(link_id_1) REFERENCES link(link_id),\
-    FOREIGN KEY(link_id_2) REFERENCES link(link_id),\
-    creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\
-    );'
-  
-const createLinkObjectTable = 'CREATE TABLE link (\
+
+const createLinkTable = 'CREATE TABLE link (\
     link_id INTEGER PRIMARY KEY AUTOINCREMENT,\
     link_name TEXT,\
     link_description TEXT,\
-    creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\
+    anchor_id_1 INTEGER NOT NULL,\
+    anchor_id_2 INTEGER NOT NULL,\
+    creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\
+    FOREIGN KEY(anchor_id_1) REFERENCES anchor(anchor_id),\
+    FOREIGN KEY(anchor_id_2) REFERENCES anchor(anchor_id)\
     );'
 
 const createAnchorTable = 'CREATE TABLE anchor (\
     anchor_id INTEGER PRIMARY KEY AUTOINCREMENT,\
-    FOREIGN KEY(link_id) REFERENCES link(link_id),\
     doc_name TEXT,\
     doc_path TEXT,\
     pdf_quads TEXT,\
-    pdf_page TEXT,\
+    pdf_page INTEGER,\
     doc_position TEXT,\
     file_type TEXT,\
     anchor_text TEXT,\
     creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\
     );'
+
