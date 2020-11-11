@@ -1,19 +1,32 @@
 const { ipcRenderer, remote } = require('electron');
 const Tabulator = require('tabulator-tables');
-const fs = require('fs')
-const path = require('path')
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('./database.js')
 
 
 const appBasePath = remote.app.getAppPath()
 const appUserPath = remote.app.getPath("userData")
-const dbFileName = 'mydatabase.sqlite'
-const fullDbPath = path.join(appUserPath,dbFileName)
-console.log(fullDbPath)
-const db = new sqlite3.Database(fullDbPath)
+
+var db = remote.getGlobal('sharedObj').db
 var tabledata = []
 var toReturnLinkId = false
 
+db.getAllLinks().then( (rows) => {
+    console.log("rows: "+JSON.stringify(rows))
+    rows.forEach((row) => {
+        tabledata.push(
+            {
+                "Link ID": row.link_id,
+                "Link Name": row.link_name,
+                "Link Description": row.link_description,
+                "Erstellungsdatum": row.creation_date
+            }
+        )
+    })
+    console.log("lets create the table!")
+    putTable();
+})
+
+/*
 db.all("SELECT * FROM links", function(err,rows){
     if(err) {
     console.log(err)
@@ -39,7 +52,7 @@ db.all("SELECT * FROM links", function(err,rows){
         putTable();
     }
 });
-
+*/
 
 /*var tabledata = [
     {id:1, name:"Oli Bob", location:"United Kingdom", gender:"male", rating:1, col:"red", dob:"14/04/1984"},
@@ -64,8 +77,8 @@ function putTable(){
             data:tabledata,
             autoColumns:true,
             rowClick:function(e, row){
-                console.log('I want to return id: '+ "something")
-                ipcRenderer.send('returnLinkId',row.getData().id);
+                console.log('I want to return id: '+row.getData()["Link ID"] +"something")
+                ipcRenderer.send('returnLinkId',row.getData()["Link ID"]);
                 window.close()
             },
         });
@@ -76,8 +89,9 @@ function putTable(){
         });
         table.addColumn({formatter:"buttonCross", width:40, align:"center", cellClick:function(e, cell){
             let row = cell.getRow()
-            console.log(row)
-            ipcRenderer.send('deleteLink',row.getData().id);
+            console.log(JSON.stringify(row.getData()["Link ID"]))
+            ipcRenderer.send('deleteLink',row.getData()["Link ID"]);
+            console.log("row.getData().link_id "+row.getData("Link ID")["Link ID"])
             cell.getRow().delete();
         }});
     }
@@ -91,3 +105,4 @@ ipcRenderer.on('requireLinkId', (event, data) => {
     
     putTable()
 });
+

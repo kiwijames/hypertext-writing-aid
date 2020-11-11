@@ -51,36 +51,25 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
       loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName)
       // TODO: allEditorAnnotationsWithLinks(Annotations, annotManager, pdfFileName)
 
-      pdfViewerWindow = document.getElementById('webviewer-1').contentWindow; //assuming webviewe-1 is allways there
+      pdfViewerWindow = document.getElementById('webviewer-1').contentWindow; //assuming webviewer-1 is allways there
       pdfViewerWindow.addEventListener("dblclick", function(event){
         console.log("clicked event inside getAnnotations")
         annoList = annotManager.getAnnotationsByMouseEvent(event)
         if(annoList){
-          //let user choose
+          //implement let user choose
           annoList.forEach(annot =>{
             //check if i is in linkId
-            let linkId = ""+annot.getCustomData('linkId')
-            console.log("link id double clicked: "+linkId)
-            if(linkId.includes("i")){
-              //internal link
-              console.log("internal link")
-              linkId = linkId.replace('i','')
-              ipcRenderer.send('openInternalLink', linkId);
-            } else if(linkId.includes("e")){
-              //internal link
-              console.log("editor link")
-              linkId = linkId.replace('e','')
-              ipcRenderer.send('openEditorLink', linkId);
-            }else{
+            let link_id = ""+annot.getCustomData('link_id')
+            let anchor_id = ""+annot.getCustomData('anchor_id')
+            console.log("link double clicked: "+link_id+", "+anchor_id)
               data = {
-                linkId : linkId,
-                pdfName : pdfFileName
+                link_id : link_id,
+                anchor_id : anchor_id
               }
               ipcRenderer.send('openOtherLink', data);
-            }
-          })
-        }
-      });
+            })
+          }
+        });
 
       ipcRenderer.on('focusText', (event, arg) => {
         console.log("open page "+arg)
@@ -105,17 +94,21 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
             $doc_position : null,
             //windowId : remote.getCurrentWindow().id
           }
+          data = {
+            anchor_1 : anchor,
+            windowId_1 : remote.getCurrentWindow().id
+          }
           alert("sth. selcted, next selection")
           //TODO highlightQuads(Annotations, annotManager, allQuads, null, true)
-          let anchors = []
-          anchors[0] = anchor
-          ipcRenderer.send('pdf-link-step2', anchors);
+
+          ipcRenderer.send('pdf-link-step2', data);
         }
       });
 
-      ipcRenderer.on('pdf-link-step3', (event, arg) => {
-        anchors = arg
-        ipcRenderer.on('pdf-link-step4', (event) => {
+      ipcRenderer.on('pdf-link-step3', (event, data) => {
+        anchors = data
+        ipcRenderer.on('pdf-link-step4', (event, arg) => {
+          if(arg) return
           // more information on quads https://www.pdftron.com/documentation/web/guides/extraction/selected-text/
           let page = docViewer.getCurrentPage();
           let quads = docViewer.getSelectedTextQuads();
@@ -131,50 +124,52 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
               $file_type: "pdf",
               $anchor_text : text,
               $doc_position : null,
-              //windowId : remote.getCurrentWindow().id
             }
+            anchors.anchor_2 = anchor
+            anchors.windowId_2 = remote.getCurrentWindow().id
             alert("sth. selcted, saving link")
-            anchors[1] = anchor
-            //TODO highlightQuads(Annotations, annotManager, allQuads, null, true)
             ipcRenderer.send('pdf-link-step5', anchors);
           }
         });
       });
 
-      ipcRenderer.on('internal-link-step1', (event, arg) => {
-        //arg should be empty
-        
+      ipcRenderer.on('pdf-link-step6', (event, data) => {
+        console.log("data: "+JSON.stringify(data))
+        highlightQuads(Annotations,annotManager,data.anchor_1.$pdf_quads,data.link_id,data.anchor_id_2,false)
+      })
+      ipcRenderer.on('pdf-link-step7', (event, data) => { 
+        console.log("data: "+JSON.stringify(data))
+        highlightQuads(Annotations,annotManager,data.anchor_2.$pdf_quads,data.link_id,data.anchor_id_1,false)
+      })
+
+      ipcRenderer.on('internal-link-step1', (event, arg) => {        
         let page = docViewer.getCurrentPage();
         let quads = docViewer.getSelectedTextQuads();
         let text = docViewer.getSelectedText();
         if(quads==null){
           alert("Please select the text to link.")
         } else{
+          anchor = {
+            $doc_name : pdfFileName,
+            $doc_path : pdfFileName,
+            $pdf_quads : quads,
+            $pdf_page: page,
+            $file_type: "pdf",
+            $anchor_text : text,
+            $doc_position : null
+          }
           data = {
-            text : text,
-            windowId : remote.getCurrentWindow().id,
-            pdfName : pdfFileName,
-            pageNumber: page,
-            quads: quads,
-            linkName: "default"
+            anchor_1: anchor,
+            windowId_1: remote.getCurrentWindow().id
           }
           alert("sth. selcted")
           ipcRenderer.send('internal-link-step2', data);
         }
       });
 
-      ipcRenderer.on('internal-link-step7', (event, arg) => {
-        //arg = {
-        //  quads: data.pdf_quads,
-        //  internalLinkId: lastLinkId,
-        //  editorWindowId: editorWindowId
-        //}
-        console.log(arg)
-        console.log("linkid "+arg.editorWindowId)
-        linkid="e"+arg.editorWindowId
-        // put arg into annotation
-        //TODOhighlightQuads(Annotations, annotManager,arg.quads,linkid,false)
-
+      ipcRenderer.on('internal-link-step7', (event, data) => {
+        console.log("internal-link-step7, received saved link "+JSON.stringify(data))
+        highlightQuads(Annotations, annotManager,data.anchor_1.$pdf_quads,data.link_id,data.anchor_id_2,false)
       });
 
       ipcRenderer.on('updateTempLinks', (event, arg) => {
@@ -199,7 +194,9 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
 
 function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id, tmpFlag) {
   let highlights = []
+  if(typeof(quads) == "string") quads = JSON.parse(quads)
   let pageNumbers = Object.keys(quads)
+  
   pageNumbers.forEach( num => {
     let highlight = new Annotations.TextHighlightAnnotation();
     highlight.PageNumber=num

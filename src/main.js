@@ -452,8 +452,7 @@ ipcMain.on('openOtherLink', (event, data) => {
 });
 
 ipcMain.on('internal-link-step2', (event, data) => {
-  tmpMenu = menu
-  tmpMenu.getMenuItemById('putPdfLink').enabled = true
+  menu.getMenuItemById('putPdfLink').enabled = true
   origSenderId=event.sender.getOwnerBrowserWindow().id
   data.origSenderId = origSenderId
   console.log("origsenderid "+data.origSenderId)
@@ -462,39 +461,7 @@ ipcMain.on('internal-link-step2', (event, data) => {
 });
 
 ipcMain.on('internal-link-step5', (event, data) => {
-  origSenderId = data.origSenderId
-  editorWindowId = data.editorWindowId
-  //dataToPutInDb = {
-  //  link_name: 'tbd', 
-  //  doc_name: 'tbd',
-  //  doc_text: 'tbd', 
-  //  doc_range: 'tbd', 
-  //  pdf_name: pdfLinkData.pdfName, 
-  //  pdf_data: pdfLinkData.pageNumber, 
-  //  pdf_quads: pdfLinkData.quads, 
-  //}
-  quads_string = JSON.stringify(data.pdf_quads)
-  let insertStatement = "INSERT INTO internallinks(link_name,doc_name,\
-                          doc_text,doc_range,pdf_name,pdf_data,pdf_quads) \
-                          VALUES('"+data.link_name+"','"+data.doc_name+"','"+data.doc_text+"','"+
-                          data.doc_range+"','"+data.pdf_name+"','"+data.pdf_data+"','"+
-                          quads_string+"')"
-  
-  global.sharedObj.database.run(insertStatement, function(err){
-    if(err){
-      console.log(err)
-    } else{
-      lastLinkId = this.lastID
-      console.log("last_insert_rowid row: "+lastLinkId)
-      event.sender.webContents.send('internal-link-step6', lastLinkId)
-      data = {
-        quads: data.pdf_quads,
-        internalLinkId: lastLinkId,
-        editorWindowId: editorWindowId,
-      }
       BrowserWindow.fromId(origSenderId).webContents.send('internal-link-step7', data)
-    }
-  });
 });
 
 ipcMain.on('call-pdf-link', (event, data) => {

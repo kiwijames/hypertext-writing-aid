@@ -19,7 +19,7 @@ global.sharedObj = {db: db}
 //todo db loading with promises and global sharing
 
 let windowPDFList = []
-let idWindowMap = {} //path to win - win mapping
+let documentWindowMap = {} //path to win - win mapping
 let idEditorMap = {} //path to win - win mapping
 let windowEditorList = []
 let editorWindow  
@@ -42,7 +42,8 @@ function createHTMLWindow(HTMLFilePath, doc_path='') {
     //maxWidth:630,
     height: 440 ,
     webPreferences: {
-      nodeIntegration:true
+      nodeIntegration:true,
+      webSecurity: false
     }
   })
   win.loadFile(HTMLFilePath)
@@ -59,10 +60,10 @@ function createHTMLWindow(HTMLFilePath, doc_path='') {
     if(doc_path!=''){
       console.log("did-finish-load "+doc_path)
       win.send('loadText', doc_path)
-      idEditorMap[HTMLFilePath] = null
+      documentWindowMap[HTMLFilePath] = null
     }
   })
-  idWindowMap[HTMLFilePath] = win
+  documentWindowMap[HTMLFilePath] = win
   windowEditorList.push(win)
   return win
 }
@@ -97,10 +98,10 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     // Dereference the window object from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
     win = null
-    idWindowMap[pdfFilePath] = null
+    documentWindowMap[pdfFilePath] = null
   })
   windowPDFList.push(win)
-  idWindowMap[pdfFilePath] = win
+  documentWindowMap[pdfFilePath] = win
   return win
 }
 
@@ -163,15 +164,9 @@ const menu = Menu.buildFromTemplate([
     label: 'View',
     submenu: [
       {
-        label: 'View PDF Links',
+        label: 'View All Links',
         click: function() {
-          createHTMLWindow('public/linked-list.html')
-        }
-      },
-      {
-        label: 'View Internal Links',
-        click: function() {
-          createHTMLWindow('public/internal-linked-list.html') 
+          createHTMLWindow('public/linked-list.html') 
         }
       }
     ]
@@ -263,6 +258,7 @@ const menuPDF = Menu.buildFromTemplate([
         id: 'finishPdfLink',
         click: function(menuItem, currentWindow) {
             currentWindow.webContents.send('pdf-link-step4')
+            windowEditorList.filter(w => w.id == currentWindow.id).forEach(w => w.send('pdf-link-step4',true)) //arg given indicate to stop other events
         }
       },{
         label: 'Internal link to editor',
@@ -346,7 +342,7 @@ app.on('ready', () => {
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
     // check table if dead internal links exist
-    //deleteUnsavedInternalLinks()
+    db.deleteTemporaryLinks()
     db.closeDatabase()
     //if(global.sharedObj.database) global.sharedObj.database.close();
 
@@ -360,51 +356,49 @@ app.on('window-all-closed', () => {
 
 ////////////////////////////message handeling////////////////////////////////////////
 
-let linkingCounter = 0
-let linkData = {
-  linkName: "default",
-  docName1: "",
-  docName2: "",
-  pageNumber1: 0,
-  pageNumber2: 0,
-  pageSelection1: "",
-  pageSelection2: ""
-}
-
 ipcMain.on('pdf-link-step2', (event, data) => {
-    console.log("pdf-link-step2 " + data)
+    console.log("pdf-link-step2 " + JSON.stringify(data))
     menuPDF.getMenuItemById('finishPdfLink').enabled = true
-    event.sender.webContents.send('pdf-link-step3',data)
+    windowPDFList.forEach(w => w.send('pdf-link-step3', data))
+    //event.sender.webContents.send('pdf-link-step3',data) when sending the menu message, exclude the other
 });
 
 ipcMain.on('pdf-link-step5', (event, data) => {
-    let anchorList = data
-    anchorList[0].$pdf_quads = JSON.stringify(anchorList[0].$pdf_quads)
-    anchorList[1].$pdf_quads = JSON.stringify(anchorList[1].$pdf_quads)
-    db.createAnchor(anchorList[0]).then( result => {
-        let anchor_id_1 = result
-        db.createAnchor(anchorList[1]).then( result => {
-            let anchor_id_2 = result
-            let link = {
-                $link_name: "default",
-                $link_description: "default",
-                $anchor_id_1: anchor_id_1,
-                $anchor_id_2: anchor_id_2
-            }
-            console.log("creating link with anchor id 1 =  "+link.$anchor_id_1)
-            console.log("creating link with anchor id 2 =  "+link.$anchor_id_2)
-            db.createLink(link).then( result => {
-                let link_id = result
-                console.log("created link successfully id "+link_id)
-            })
-        })
+  menuPDF.getMenuItemById('finishPdfLink').enabled = false
+  console.log("\n\nsaving pdf links"+JSON.stringify(data))
+    db.createLinkWithAnchors("default", "default", data.anchor_1, data.anchor_2).then( (link_ids) => {
+      data.link_id = link_ids.link_id
+      data.anchor_id_1 = link_ids.anchor_id_1
+      data.anchor_id_2 = link_ids.anchor_id_2
+      BrowserWindow.fromId(data.windowId_1).webContents.send('pdf-link-step6', data)
+      BrowserWindow.fromId(data.windowId_2).webContents.send('pdf-link-step7', data)
     })
-    
-    console.log(data)
     
 });
 
+ipcMain.on('openOtherLink', (event, data) => {
+  console.log("openOtherLink clicked: "+JSON.stringify(data))
+  db.getOtherAnchorData(data.link_id, data.anchor_id).then( (data) => {
+    console.log("db returned data")
+    if(documentWindowMap[data.doc_name]) documentWindowMap[data.doc_name].focus()
+    else{
+      //to change path.join(data.doc_path,data.doc_name)
+      createPDFWindow(data.doc_name)
+    }
+  })
+});
 
+ipcMain.on('internal-link-step2', (event, data) => {
+  menu.getMenuItemById('putPdfLink').enabled = true
+  console.log("origsenderid "+data.windowId_1)
+  console.log("origsenderid anchor "+data.anchor_1)
+  windowEditorList.forEach(w => w.send('internal-link-step3', data))
+});
+
+ipcMain.on('internal-link-step5', (event, data) => {
+  console.log("internal-link-step5" + JSON.stringify(data))
+  BrowserWindow.fromId(data.windowId_1).webContents.send('internal-link-step7', data)
+});
 
 ipcMain.on('save-link', (event, data) => {
   linkData.linkName = data.linkName
@@ -426,8 +420,6 @@ ipcMain.on('save-link', (event, data) => {
   });
 });
 
-
-
 ipcMain.on('requireLinkId', (event, arg) => {
   let windowThatWantsLink = event.sender
   console.log("start requireLinkId")
@@ -441,95 +433,9 @@ ipcMain.on('requireLinkId', (event, arg) => {
   });
 });
 
-ipcMain.on('deleteLink', (event, arg) => {
-  console.log(arg)
-  deleteLinkEntryById(arg)
-});
-ipcMain.on('deleteInternalLink', (event, arg) => {
-  console.log(arg)
-  deleteInternalLinkEntryById(arg)
-});
-
-
-ipcMain.on('call-linked-links', (event, arg) => {
-  //arg = link_id
-  compareElementsFromLinkId(arg)
-});
-
-ipcMain.on('openOtherLink', (event, data) => {
-  //data = {
-  //  linkId : linkId,
-  //  pdfName : pdfFileName
-  //}
-  openOtherLink(data.linkId, data.pdfName)
-});
-
-ipcMain.on('internal-link-step2', (event, data) => {
-  menu.getMenuItemById('putPdfLink').enabled = true
-  origSenderId=event.sender.getOwnerBrowserWindow().id
-  data.origSenderId = origSenderId
-  console.log("origsenderid "+data.origSenderId)
-  console.log("origsenderid data "+data)
-  windowEditorList.forEach(w => w.send('internal-link-step3', data)) //But how to stop broadcast
-});
-
-ipcMain.on('internal-link-step5', (event, data) => {
-  origSenderId = data.origSenderId
-  editorWindowId = data.editorWindowId
-  //dataToPutInDb = {
-  //  link_name: 'tbd', 
-  //  doc_name: 'tbd',
-  //  doc_text: 'tbd', 
-  //  doc_range: 'tbd', 
-  //  pdf_name: pdfLinkData.pdfName, 
-  //  pdf_data: pdfLinkData.pageNumber, 
-  //  pdf_quads: pdfLinkData.quads, 
-  //}
-  quads_string = JSON.stringify(data.pdf_quads)
-  let insertStatement = "INSERT INTO internallinks(link_name,doc_name,\
-                          doc_text,doc_range,pdf_name,pdf_data,pdf_quads) \
-                          VALUES('"+data.link_name+"','"+data.doc_name+"','"+data.doc_text+"','"+
-                          data.doc_range+"','"+data.pdf_name+"','"+data.pdf_data+"','"+
-                          quads_string+"')"
-  
-  global.sharedObj.database.run(insertStatement, function(err){
-    if(err){
-      console.log(err)
-    } else{
-      lastLinkId = this.lastID
-      console.log("last_insert_rowid row: "+lastLinkId)
-      event.sender.webContents.send('internal-link-step6', lastLinkId)
-      data = {
-        quads: data.pdf_quads,
-        internalLinkId: lastLinkId,
-        editorWindowId: editorWindowId,
-      }
-      BrowserWindow.fromId(origSenderId).webContents.send('internal-link-step7', data)
-    }
-  });
-});
-
-ipcMain.on('call-pdf-link', (event, data) => {
-  //data = linkID
-  
-  openPdfLink(data)
-});
-
-ipcMain.on('openInternalLink', (event, data) => {
-  //data = linkID
-  console.log("need to open editor with text with id "+data)
-  //todo, open editor with saved text
-  doc_path = getInternalLinkDocPath(data)
-  console.log("docPath: "+doc_path)
-  //todo with await and promises
-  //createHTMLWindow('public/editor.html',doc_path)
-});
-
-ipcMain.on('openEditorLink', (event, data) => {
-  //data = windowID
-  console.log("window id that gets focus:"+data)
-  //BrowserWindow.fromId(data).focus() //not working!
-  windowEditorList.filter(w => w.id !== data).pop().focus()
+ipcMain.on('deleteLink', (event, link_id) => {
+  console.log("deleted link with id "+link_id)
+  db.deleteLinkById(link_id)
 });
 
 ipcMain.on('saveTextAsHTML-step2',(event, data) => {
@@ -540,35 +446,6 @@ ipcMain.on('saveTextAsHTML-step2',(event, data) => {
 });
 
 ////////////////////////////database functions////////////////////////////////////////
-function getInternalLinkDocPath(link_id) {
-  let selectStatement = "Select doc_name from internallinks WHERE link_id="+link_id;
-  global.sharedObj.database.all(selectStatement, function(err,rows){
-    if(err){
-      console.log(err)
-    }else{
-      rows.forEach((row) => {
-        doc_path = rows[0].doc_name
-        console.log("returning do path "+doc_path)
-        if(idEditorMap[doc_path]) idEditorMap[doc_path].focus()
-        else createHTMLWindow('public/editor.html',doc_path)
-        return doc_path
-      })
-    }
-  })
-
-}
-
-function deleteUnsavedInternalLinks() {
-  let deleteStatement = "DELETE FROM internallinks WHERE doc_name='tbd'";
-  global.sharedObj.database.run(deleteStatement, function(err){
-    if(err){
-      console.error("problem deleting internallink")
-      console.error(err)
-    } else console.debug("deleted internallinks with doc_name tbd")
-  });
-}
-
-
 
 function putPathForInternalIds(internalLinkIdList, filePath){
   console.log("internallink id list? "+internalLinkIdList)
@@ -590,57 +467,7 @@ function putPathForInternalId(internalLinkId, filePath){
   });
 }
 
-function openPdfLink(link_id){
-  let selectStatement = "SELECT * from internallinks WHERE link_id="+link_id;
-  global.sharedObj.database.all(selectStatement, function(err,rows){
-    if(err){
-      console.log(err)
-    }else{
-      rows.forEach((row) => {
-        pdf_name = rows[0].pdf_name
-        data = rows[0].pdf_data //page
-        quads = JSON.parse(rows[0].pdf_quads)
 
-        
-        if(windowPDFList[pdf_name]) windowPDFList[pdf_name].focus() //only works with promise, as sqlite3 async
-        else createPDFWindow(pdf_name,data,quads)
-      })
-    }
-  })
-}
-
-//TODO: remove hard coded function call, do with callback
-function openOtherLink(link_id, pdfName){
-  let selectStatement = "SELECT * from links WHERE link_id="+link_id;
-  //let db = new sqlite3.Database('mydatabase.sqlite')
-  if(!link_id) return;
-  global.sharedObj.database.all("SELECT * FROM links WHERE link_id="+link_id+";", function(err,rows){ //only 1 row, as id unique
-    if(err){
-      console.error("problem getting link")
-      console.error(err)
-    }else{
-      let row = rows[0]
-      console.log(pdfName+" == "+row.document_name_1)
-      if(pdfName == row.document_name_1){
-        doc = row.document_name_2
-        if(idWindowMap[doc]){
-          let win = idWindowMap[doc]
-          console.log("focus on "+doc)
-          win.focus()
-          win.webContents.send('focusText',row.document_data_2)
-        }else createPDFWindow(doc, row.document_data_2, JSON.parse(row.document_quads_2), link_id)
-      }else{
-        doc = row.document_name_1
-        if(idWindowMap[doc]){
-          let win = idWindowMap[doc]
-          console.log("focus on "+doc)
-          win.focus()
-          win.webContents.send('focusText',row.document_data_1)
-        }else createPDFWindow(doc, row.document_data_1, JSON.parse(row.document_quads_1), link_id)
-      }
-    }
-  })
-}
 
 
 //TODO: remove hard coded function call, do with callback
@@ -667,87 +494,3 @@ function compareElementsFromLinkId(link_id, callback){
 }
 
 
-/**
- * Deletes entry from the 'links' table,
- * based on the given link_id.
- * @param  {Number} link_id Id corresponding to an entry in the 'links' table
- */
-function deleteLinkEntryById(link_id) {
-  let deleteStatement = "DELETE FROM links WHERE link_id="+link_id;
-  //let db = new sqlite3.Database(fullDbPath)
-  global.sharedObj.database.run(deleteStatement, function(err){
-    if(err){
-      console.error("problem deleting link")
-      console.error(err)
-    } else console.debug("deleted link with id"+link_id)
-  });
-}
-
-function deleteInternalLinkEntryById(link_id) {
-  let deleteStatement = "DELETE FROM internallinks WHERE link_id="+link_id;
-  //let db = new sqlite3.Database(fullDbPath)
-  global.sharedObj.database.run(deleteStatement, function(err){
-    if(err){
-      console.error("problem deleting link")
-      console.error(err)
-    } else console.debug("deleted link with id"+link_id)
-  });
-}
-
-
-
-/**
- * Creates a database with the default schema,
- * based on the given path and name.
- * @param  {String} fullDbPath Complete path of the sqlite3 database file
- */
-async function initDatabase(fullDbPath){
-  let fullFilePath = fullDbPath
-  //Creating a table automatically includes ROWID
-  //document_name_X is the name of the document in which the link was set
-  //document_data includes the text, as well as the quads and page_number
-  createLinkTable = 'CREATE TABLE links (\
-    link_id INTEGER PRIMARY KEY AUTOINCREMENT,\
-    link_name TEXT,\
-    document_name_1 TEXT NOT NULL,\
-    document_data_1 TEXT NOT NULL,\
-    document_quads_1 TEXT NOT NULL,\
-    document_name_2 TEXT NOT NULL,\
-    document_data_2 TEXT NOT NULL,\
-    document_quads_2 TEXT NOT NULL,\
-    creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\
-    );'
-  
-    createInternalLinkTable = 'CREATE TABLE internallinks (\
-      link_id INTEGER PRIMARY KEY AUTOINCREMENT,\
-      link_name TEXT,\
-      doc_name TEXT NOT NULL,\
-      doc_text TEXT NOT NULL,\
-      doc_range TEXT NOT NULL,\
-      pdf_name TEXT NOT NULL,\
-      pdf_data TEXT NOT NULL,\
-      pdf_quads TEXT NOT NULL,\
-      creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\
-      );'
-
-  //TODO: document mapping for name-changes
-
-  fs.access(fullFilePath, fs.F_OK, (err) => {
-    if (err) {
-      console.log(err)
-      console.log("Datbase not found.")
-      console.log("Datbase will be initiated found.")
-      let db = new sqlite3.Database(fullFilePath)
-      global.sharedObj = {database: db}
-      db.run(createLinkTable)
-      db.run(createInternalLinkTable)
-      return db
-    }else{
-      let db = new sqlite3.Database(fullFilePath)
-      global.sharedObj = {database: db}
-      console.log("db exists under : "+fullFilePath)
-      console.log("db exists: "+db)
-      return db
-    }
-  })
-}

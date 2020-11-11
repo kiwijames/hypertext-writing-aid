@@ -47,23 +47,51 @@ module.exports = class Database {
     }
 
 
+    createLinkWithAnchors(link_name, link_description, anchor_1, anchor_2){
+        return new Promise( (resolve,reject) => {
+            console.log("createLinkWithAnchors called")
+            this.createAnchor(anchor_1).then( (anchor_id_1) => {
+                console.log("first anchor")
+                this.createAnchor(anchor_2).then( (anchor_id_2) => {
+                    console.log("second anchr")
+                    let link = {
+                        $link_name : link_name,
+                        $link_description : link_description,
+                        $anchor_id_1 : anchor_id_1,
+                        $anchor_id_2 : anchor_id_2
+                    }
+                    console.log("link= "+JSON.stringify(link))
+                    this.createLink(link).then( (link_id) => {
+                        let link_ids = {
+                            link_id : link_id,
+                            anchor_id_1 : anchor_id_1,
+                            anchor_id_2 : anchor_id_2
+                        }
+                        console.log("link finished")
+                        resolve(link_ids)
+                    })
+                })
+            })
+        })
+    }   
+
 
     /**
     * Returns a promise returning an error or the id of the new link
     * @param  {Object} link corresponds to the database object
     */
-   createLink(link){
-    return new Promise((resolve,reject) => {
-        this.db.run("INSERT INTO link(link_name,link_description,anchor_id_1,anchor_id_2) \
-        VALUES($link_name,$link_description,$anchor_id_1,$anchor_id_2)", link, function (err) {
-            if(err) {
-                console.log(err)
-                reject(err)
-            }
-            else resolve(this.lastID)
+    createLink(link){
+        return new Promise( (resolve,reject) => {
+            this.db.run("INSERT INTO 'link' (link_name,link_description,anchor_id_1,anchor_id_2) \
+            VALUES($link_name,$link_description,$anchor_id_1,$anchor_id_2)", link, function (err) {
+                if(err) {
+                    console.log("error "+err)
+                    reject(err)
+                }
+                else resolve(this.lastID)
+            })
         })
-    })
-}
+    }   
 
 
     /**
@@ -71,6 +99,7 @@ module.exports = class Database {
     * @param  {Object} anchor corresponds to the database object
     */
     createAnchor(anchor){
+        anchor.$pdf_quads = JSON.stringify(anchor.$pdf_quads)
         console.log("putting anchor into table")
         return new Promise((resolve,reject) => {
             this.db.run("INSERT INTO 'anchor' (doc_name,  doc_path,  file_type,  anchor_text,  pdf_quads,  pdf_page,  doc_position) \
@@ -86,6 +115,23 @@ module.exports = class Database {
         })
     }
 
+        /**
+    * Returns a promise returning all links with anchor data
+    * @return  {[Object]} list of sqlite3 database objects
+    */
+   getAllLinks(){
+       console.log("getting all links")
+        return new Promise((resolve,reject) => {
+            this.db.all("SELECT * FROM link INNER JOIN anchor AS anchor_1 ON anchor_1.anchor_id = link.anchor_id_1 \
+                        INNER JOIN anchor AS anchor_2 ON anchor_2.anchor_id = link.anchor_id_2", (err,rows) => {
+                if(err) {
+                    console.log(err)
+                    reject(err)
+                }
+                else resolve(rows)
+            })
+        })
+    }
 
 
     /**
@@ -95,8 +141,11 @@ module.exports = class Database {
     */
     getAllAnchorsForDoc(doc_name){
         return new Promise((resolve,reject) => {
-            this.db.all("SELECT * FROM anchor WHERE anchor.doc_name = ?",
-                        doc_name, (err,rows) => {
+            this.db.all("SELECT * FROM link \
+                        INNER JOIN anchor AS anchor_1 ON anchor_1.anchor_id = link.anchor_id_1 \
+                        INNER JOIN anchor AS anchor_2 ON anchor_2.anchor_id = link.anchor_id_2 \
+                        WHERE anchor_1.doc_name = ? OR anchor_2.doc_name = ?",
+                        doc_name, doc_name, (err,rows) => {
                 if(err) {
                     console.log(err)
                     reject(err)
@@ -114,11 +163,15 @@ module.exports = class Database {
      * @return  {Object} sqlite3 database object
      */
     getOtherAnchorData(link_id, anchor_id){
+        console.log("getOtherAnchorDatacalled")
         return new Promise((resolve,reject) => {
-            this.db.get("SELECT * FROM anchor WHERE anchor.link_id = ? AND anchor.anchor_id != ?", 
-                            link_id, anchor_id, (err,row) => {
-                if(err) return reject
-                else return resolve(row)
+            this.db.get("SELECT * FROM link \
+            INNER JOIN anchor AS anchor_1 ON anchor_1.anchor_id = link.anchor_id_1 \
+            INNER JOIN anchor AS anchor_2 ON anchor_2.anchor_id = link.anchor_id_2 \
+            WHERE link.link_id = ? AND (anchor_1.anchor_id != ? OR anchor_2.anchor_id != ?)", 
+                            link_id, anchor_id, anchor_id, (err,row) => {
+                if(err) reject(err)
+                else resolve(row)
             })
         })
     }
@@ -131,8 +184,8 @@ module.exports = class Database {
     getAnchorData(anchor_id) {
         return new Promise((resolve,reject) => {
             this.db.get("SELECT * FROM anchor WHERE anchor_id= ?", anchor_id, (err,row) => {
-                if(err) return reject
-                else return resolve(row)
+                if(err) reject(err)
+                else resolve(row)
             })
         })
     }
@@ -148,8 +201,8 @@ module.exports = class Database {
                         INNER JOIN anchor AS anchor_1 ON anchor_1.link_id = link.link_id \
                         INNER JOIN anchor AS anchor_2 ON anchor_2.link_id = link.link_id \
                         WHERE link.link_id= ?", link_id, (err,row) => {
-                if(err) return reject
-                else return resolve(row)
+                if(err) reject(err)
+                else resolve(row)
             })
         })
     }
@@ -163,8 +216,8 @@ module.exports = class Database {
     getBasicLinkData(link_id) {
         return new Promise((resolve,reject) => {
             this.db.get("SELECT * FROM link WHERE link_id= ?", link_id, (err,row) => {
-                if(err) return reject
-                else return resolve(row)
+                if(err) reject(err)
+                else resolve(row)
             })
         })
     }
@@ -175,10 +228,27 @@ module.exports = class Database {
      * @param  {Number} link_id Id corresponding to an entry in the 'link' table
      */
     deleteLinkById(link_id) {
-        let deleteStatement = "DELETE FROM link WHERE link_id = ?";
+        let deleteStatement = "DELETE FROM link WHERE link_id = ?"
         this.db.run(deleteStatement, link_id, function(err){
         if(err) console.error("Error occured when trying to delete link ",err)
         else console.debug("Finished deleting link with the link_id "+link_id)
+        });
+    } 
+
+    /**
+     * Deletes entry from the 'link' table given the link_id.
+     * Objects related with foreign key restraints are deleted as well! (TODO CHECK if foreign key auto deletion)
+     * @param  {Number} link_id Id corresponding to an entry in the 'link' table
+     */
+    deleteTemporaryLinks() {
+        let deleteStatement = "DELETE FROM link WHERE link_id IN ( \
+            SELECT link_temp.link_id FROM link AS link_temp\
+            INNER JOIN anchor AS anchor_1 ON anchor_1.anchor_id = link_temp.anchor_id_1 \
+            INNER JOIN anchor AS anchor_2 ON anchor_2.anchor_id = link_temp.anchor_id_2 \
+            WHERE anchor_1.doc_name = 'tbd' OR anchor_2.doc_name = 'tbd')"
+        this.db.run(deleteStatement, function(err){
+        if(err) console.error("Error occured when trying to delete links",err)
+        else console.debug("Finished deleting temp links")
         });
     } 
 }
