@@ -274,32 +274,6 @@ const menuPDF = Menu.buildFromTemplate([
 //Set Menu for all windows, since mac doesnt allow individual window menus
 Menu.setApplicationMenu(menu);
 
-
-////////////////////////////link linking handeling////////////////////////////////////////
-
-/**
- * Creates 2 windows of pdf documents next to each other.
- * @param  {String} pdfPath1 Absolute path to a PDF file.
- * @param  {String} pdfPath2 Absolute path to a PDF file.
- * @param  {Number} pageNumber1 On which page to open the file.
- * @param  {Number} pageNumber2 On which page to open the file.
- * @param  {Object} quads1 PDFtron values of linked elements.
- * @param  {Object} quads1 PDFtron values of linked elements.
- * @param  {Number} link_id The link id for using the links.
- */
-function linklink(pdfPath1,pdfPath2,pageNumber1=1,pageNumber2=1,quads1,quads2, link_id){
-  const {screen} = require('electron')
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize
-
-  console.log(link_id)
-  let win1 = createPDFWindow(pdfPath1,pageNumber1,quads1,link_id)
-  let win2 = createPDFWindow(pdfPath2,pageNumber2,quads2,link_id)
-  win1.setSize(width/2,height)
-  win2.setSize(width/2,height)
-  win1.setPosition(0,0)
-  win2.setPosition(width/2,0)
-}
-
 ////////////////////////////app event handeling////////////////////////////////////////
 
 // Create main window when ready
@@ -379,7 +353,7 @@ ipcMain.on('pdf-link-step5', (event, data) => {
 ipcMain.on('openOtherLink', (event, data) => {
   console.log("openOtherLink clicked: "+JSON.stringify(data))
   db.getOtherAnchorData(data.link_id, data.anchor_id).then( (data) => {
-    console.log("db returned data")
+    console.log("db returned data" + JSON.stringify(data))
     if(documentWindowMap[data.doc_name]) documentWindowMap[data.doc_name].focus()
     else{
       //to change path.join(data.doc_path,data.doc_name)
@@ -440,57 +414,11 @@ ipcMain.on('deleteLink', (event, link_id) => {
 
 ipcMain.on('saveTextAsHTML-step2',(event, data) => {
   //data = file path and internalLinkIdList
-  console.log("internallink id list? "+data.internalLinkIdList)
-  putPathForInternalIds(data.internalLinkIdList, data.filepath)
+  console.log("need to put links with this data "+JSON.stringify(data))
+  data.filePath
+  data.linkList.forEach(link => {
+    db.updateTemporaryAnchors(link.link_id, link.anchor_id,data.filePath,data.filePath,"","")
+  })
   //update links in pdf-viewers
 });
-
-////////////////////////////database functions////////////////////////////////////////
-
-function putPathForInternalIds(internalLinkIdList, filePath){
-  console.log("internallink id list? "+internalLinkIdList)
-  internalLinkIdList.forEach(id=>putPathForInternalId(id,filePath))
-}
-
-function putPathForInternalId(internalLinkId, filePath){
-  let insertStatement = "UPDATE internallinks SET doc_name='"+filePath+"' WHERE link_id="+internalLinkId
-
-  global.sharedObj.database.run(insertStatement, function(err){
-    if(err){
-      console.log(err)
-      console.log("PROBLEM internal link with id "+internalLinkId)
-      return false
-    }else{
-      console.log("inserted internal link with id "+internalLinkId)
-      return true
-    }
-  });
-}
-
-
-
-
-//TODO: remove hard coded function call, do with callback
-function compareElementsFromLinkId(link_id, callback){
-  let selectStatement = "SELECT * from links WHERE link_id="+link_id;
-  //let db = new sqlite3.Database('mydatabase.sqlite')
-  db.all(selectStatement, function(err,rows){
-    if(err){
-      console.log(err)
-    }else{
-      rows.forEach((row) => {
-        path1 = rows[0].document_name_1
-        path2 = rows[0].document_name_2
-        pageNumber1 = rows[0].document_data_1
-        pageNumber2 = rows[0].document_data_2
-        quadsString1 = rows[0].document_quads_1
-        quadsString2 = rows[0].document_quads_2
-        quads1 = JSON.parse(quadsString1)
-        quads2 = JSON.parse(quadsString2)
-        linklink(path1,path2,pageNumber1,pageNumber2,quads1,quads2,link_id)
-      })
-    }
-  })
-}
-
 

@@ -40,16 +40,13 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
     const { Annotations, annotManager, docViewer } = instance;
     // wait until the PDF finished loading
     docViewer.on('documentLoaded', () => {
-      // ~10 Sekunden bis hier hin vom window start
+      // ~10 Sekunden bis hier hin vom window start; scheint wohl an pdf und rechner speed zu liegen
       console.debug("pdf-viewer.js document ready")
       // Viewer properties
       docViewer.setCurrentPage(pageNumber)
       //docViewer.setFitMode("FitWidth") //not a function..?
 
-      // Highlight link if given
-      //if(quads) highlightQuads(Annotations, annotManager, quads, link_id)
-      loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName)
-      // TODO: allEditorAnnotationsWithLinks(Annotations, annotManager, pdfFileName)
+            loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName)
 
       pdfViewerWindow = document.getElementById('webviewer-1').contentWindow; //assuming webviewer-1 is allways there
       pdfViewerWindow.addEventListener("dblclick", function(event){
@@ -219,7 +216,7 @@ function loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName){
   db.getAllAnchorsForDoc(pdfFileName).then((rows) => { //ONLY THE DOCUMENT NAME //HOW TO CHECK FOR ERRORS?
     //if(rows) return console.debug("there might be a problem here")
     console.log("pdfFileName: "+pdfFileName)
-    console.log("rows: "+rows)
+    console.log("rows: "+JSON.stringify(rows))
     //console.log("number of rows: "+rows.length())
     rows.forEach((row) => {
       console.log("reihe "+row)
@@ -227,25 +224,4 @@ function loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName){
       highlightQuads(Annotations, annotManager, quads, row.link_id, row.anchor_id)
     })
   })
-}
-
-// same for links to editor files
-// internal links to editor
-function allEditorAnnotationsWithLinks(Annotations, annotManager, pdfFileName){
-  /*let selectStatement = "SELECT * from internallinks WHERE pdf_name LIKE '"+pdfFileName+"'";
-  //let db = new sqlite3.Database('mydatabase.sqlite')
-  db.all(selectStatement, function(err,rows){
-    if(err){
-      console.error("problem getting link")
-      console.error(err)
-    }else{
-      console.log("now print rows")
-      rows.forEach((row) => {
-        console.log("reihe "+row)
-        quads = JSON.parse(row.pdf_quads)
-        linkId = "i"+row.link_id
-        highlightQuads(Annotations, annotManager, quads, linkId)
-      })
-    }
-  })*/
 }

@@ -45,7 +45,17 @@ module.exports = class Database {
     closeDatabase() {
         this.db.close()
     }
-
+    
+    updateTemporaryAnchors(link_id, anchor_id, doc_name, doc_path, doc_position, anchor_text){
+        this.db.run("UPDATE anchor \
+        SET doc_name = ?, doc_path = ?, doc_position = ?, anchor_text = ? \
+        WHERE anchor.anchor_id = ?", 
+        doc_name, doc_path, doc_position, anchor_text, anchor_id, function (err) {
+            if(err) {
+                console.log("error "+err)
+            }
+        })
+}   
 
     createLinkWithAnchors(link_name, link_description, anchor_1, anchor_2){
         return new Promise( (resolve,reject) => {
@@ -115,15 +125,20 @@ module.exports = class Database {
         })
     }
 
-        /**
+    /**
     * Returns a promise returning all links with anchor data
     * @return  {[Object]} list of sqlite3 database objects
     */
-   getAllLinks(){
-       console.log("getting all links")
+         
+    getAllLinks(){
+        console.log("getting all links")
         return new Promise((resolve,reject) => {
-            this.db.all("SELECT * FROM link INNER JOIN anchor AS anchor_1 ON anchor_1.anchor_id = link.anchor_id_1 \
-                        INNER JOIN anchor AS anchor_2 ON anchor_2.anchor_id = link.anchor_id_2", (err,rows) => {
+            this.db.all("SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, \
+            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, \
+            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2 \
+            FROM link l\
+            INNER JOIN anchor AS a1 ON a1.anchor_id = l.anchor_id_1 \
+            INNER JOIN anchor AS a2 ON a2.anchor_id = l.anchor_id_2", (err,rows) => {
                 if(err) {
                     console.log(err)
                     reject(err)
@@ -141,11 +156,8 @@ module.exports = class Database {
     */
     getAllAnchorsForDoc(doc_name){
         return new Promise((resolve,reject) => {
-            this.db.all("SELECT * FROM link \
-                        INNER JOIN anchor AS anchor_1 ON anchor_1.anchor_id = link.anchor_id_1 \
-                        INNER JOIN anchor AS anchor_2 ON anchor_2.anchor_id = link.anchor_id_2 \
-                        WHERE anchor_1.doc_name = ? OR anchor_2.doc_name = ?",
-                        doc_name, doc_name, (err,rows) => {
+            this.db.all("SELECT * FROM link, anchor WHERE (anchor_id = link.anchor_id_1 OR anchor_id = link.anchor_id_2) AND doc_name = ?",
+                        doc_name, (err,rows) => {
                 if(err) {
                     console.log(err)
                     reject(err)
@@ -165,11 +177,9 @@ module.exports = class Database {
     getOtherAnchorData(link_id, anchor_id){
         console.log("getOtherAnchorDatacalled")
         return new Promise((resolve,reject) => {
-            this.db.get("SELECT * FROM link \
-            INNER JOIN anchor AS anchor_1 ON anchor_1.anchor_id = link.anchor_id_1 \
-            INNER JOIN anchor AS anchor_2 ON anchor_2.anchor_id = link.anchor_id_2 \
-            WHERE link.link_id = ? AND (anchor_1.anchor_id != ? OR anchor_2.anchor_id != ?)", 
-                            link_id, anchor_id, anchor_id, (err,row) => {
+            this.db.get("SELECT * FROM link, anchor WHERE (anchor_id=anchor_id_1 OR anchor_id=anchor_id_2) AND link_id = ? AND anchor_id != ? \
+            ", 
+                            link_id, anchor_id, (err,row) => {
                 if(err) reject(err)
                 else resolve(row)
             })

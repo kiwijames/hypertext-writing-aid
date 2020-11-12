@@ -16,26 +16,29 @@ ipcRenderer.on('saveTextAsHTML', (event, data) => {
     let filepath = data// + ".html"
     let content = document.getElementById('textBox').innerHTML
     let anchors = Array.from(document.getElementById('textBox').getElementsByTagName('a'))
-    let internalLinkIdList = []
+    let linkList = []
     anchors.forEach(x => {
         onclickfuntion = x.getAttribute('onclick')
+        //callinternalLink("+data.link_id+", "+data.anchor_id_1+");"
         if(onclickfuntion.includes('callinternalLink')) {
-            internaLlinkId = onclickfuntion.split('(')[1].split(')')[0]
+            link = {
+                link_id : onclickfuntion.split('(')[1].split(',')[0],
+                anchor_id : onclickfuntion.split(',')[1].split(')')[0].trim()
+            }
         }
-        internalLinkIdList.push(internaLlinkId)
+        linkList.push(link)
     })
 
     fs.writeFile(filepath, content, (err) => {
         if (err) {
-            alert("An error ocurred updating the file" + err.message);
+            alert("An error ocurred writing the file" + err.message);
             console.log(err);
         }else{
             newData = {
-                filepath:data,
-                internalLinkIdList:internalLinkIdList
+                filePath: data,
+                linkList: linkList
             }
-            console.log("internalLinkIdList: "+internalLinkIdList)
-            console.log("internalLinkIdList: "+newData.internalLinkIdList)
+            console.log("saving document with all this data: "+ JSON.stringify(newData))
             ipcRenderer.send('saveTextAsHTML-step2',newData)
             alert("The file has been succesfully saved");
         
@@ -95,7 +98,7 @@ ipcRenderer.on('internal-link-step3', (event, data) => {//sent from main.js. bas
                 data.anchor_id_2 = link_ids.anchor_id_2
                 ipcRenderer.send('internal-link-step5', data) //give other window all the data
 
-                linkingFunction = "callinternalLink("+data.link_id+", "+data.anchor_id_1+");"
+                linkingFunction = "callinternalLink("+data.link_id+", "+data.anchor_id_2+");"
                 newTextElement.setAttribute('onclick',linkingFunction)
 
                 if (text.rangeCount) {

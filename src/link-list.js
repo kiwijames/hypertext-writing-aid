@@ -18,7 +18,11 @@ db.getAllLinks().then( (rows) => {
                 "Link ID": row.link_id,
                 "Link Name": row.link_name,
                 "Link Description": row.link_description,
-                "Erstellungsdatum": row.creation_date
+                "Creation Date": row.creation_date,
+                "Document Name (1)": row.doc_name_1,
+                "Anchor Text (1)": row.anchor_text_1,
+                "Document Name (2)": row.doc_name_2,
+                "Anchor Text (2)": row.anchor_text_2,
             }
         )
     })
