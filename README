@@ -2,14 +2,12 @@ This program is for my master thesis.
 The starting point gave the template of the pdftron Viewer. (license to be checked)
 
 TODOS:
+ - check last_modified of docs
  - allow the user to decide which link to follow (thus support when multiple annoations of same)
  - allow user to decide to open new document on same-document-link
+ - generalise link making with buttons in menu
 
  TO DISCUSS in theory:
  - import file by url
  - share links
  - save arrangement
-
-user experience:
- - on startup select default path of documents or so
- - check if document moved but same name, ask user?
