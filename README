@@ -2,7 +2,6 @@ This program is for my master thesis.
 The starting point gave the template of the pdftron Viewer. (license to be checked)
 
 TODOS:
- - handel database more general with proper async functionality
  - allow the user to decide which link to follow (thus support when multiple annoations of same)
  - allow user to decide to open new document on same-document-link
  - document id/name mapping for name-changes or missing docs
@@ -15,23 +14,3 @@ TODOS:
 user experience:
  - on startup select default path of documents or so
  - check if document moved but same name, ask user?
-
-
---Notes--
-
-  /*
-  console.log('A row has been inserted');
-  db.all("SELECT * FROM links", function(err,rows){
-    let rowText ="link_id | link_name | name1 | data1 | name2 | data2\n"
-    rows.forEach((row) => {
-      rowText = rowText+row.link_id+"|"+row.link_name+"|"+row.document_name_1+"|"+row.document_data_1+"|"+row.document_name_2+"|"+row.document_data_2+"\n"
-    });
-    editorWindow.webContents.send('table-data',rowText)
-  })*/
-
-    //DocumentNameMappingTable = 'CREATE TABLE documents (\
-//  document_id INTEGER PRIMARY KEY AUTOINCREMENT\
-//  document_name TEXT NOT NULL\
-//  \
-//  );'
-

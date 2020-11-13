@@ -25,13 +25,14 @@
   },
   "dependencies": {
     "@pdftron/webviewer": "^7.0.0",
-    "tabulator-tables": "^4.8.2",
-    "sqlite3": "^5.0.0"
+    "electron-multi-prompt": "^1.0.5",
+    "sqlite3": "^5.0.0",
+    "tabulator-tables": "^4.8.2"
   },
   "build": {
     "appId": "org.upb.hypertextwritingaid",
     "files": [
-      "**/*", 
+      "**/*",
       "build/icon.*"
     ],
     "fileAssociations": [
@@ -50,10 +51,10 @@
       ]
     },
     "win": {
-      "target": "NSIS", 
+      "target": "NSIS",
       "icon": "build/icon.ico"
-    }, 
-    "nsis":{
+    },
+    "nsis": {
       "perMachine": true
     }
   }

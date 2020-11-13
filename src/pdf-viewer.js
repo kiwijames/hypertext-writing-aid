@@ -14,25 +14,27 @@ var db = remote.getGlobal('sharedObj').db
 
 //Wait for pdfFile to be given
 ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads, link_id) => {
-  var pdfFilePath = path.resolve(pdfFile)
+  var pdfFilePathFull = path.resolve(pdfFile)
 
   // putting vars into debug log
     console.debug("baseBath: "+appBasePath)
     console.debug("linkid: "+link_id)
-    console.debug("received pdfFile "+pdfFilePath)
+    console.debug("received pdfFile "+pdfFilePathFull)
     console.debug("received pageNumber "+pageNumber)
     console.debug("received quads: "+JSON.stringify(quads))
-  createPDFViewer(pdfFilePath, pageNumber, quads, link_id, appBasePath)
+  createPDFViewer(pdfFilePathFull, pageNumber, quads, link_id, appBasePath)
 });
 
 // All functionality inside, so it starts when document finished loading
-function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath){
+function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBasePath){
+  var pdfFileName = path.basename(pdfFilePathFull)
+  var pdfFilePath = path.dirname(pdfFilePathFull)
   console.debug("pdf-viewer.js creating viewer")
   const viewerElement = document.getElementById('viewer');
   let webviewerPath = path.resolve(path.join(appBasePath,'node_modules/@pdftron/webviewer/public'))
   WebViewer({
     path: webviewerPath,
-    initialDoc: pdfFileName,
+    initialDoc: pdfFilePathFull,
   }, viewerElement).then(instance => {
     console.debug("pdf-viewer.js viewer ready")
     // Interact with APIs here.
@@ -46,7 +48,7 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
       docViewer.setCurrentPage(pageNumber)
       //docViewer.setFitMode("FitWidth") //not a function..?
 
-            loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName)
+      loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName)
 
       pdfViewerWindow = document.getElementById('webviewer-1').contentWindow; //assuming webviewer-1 is allways there
       pdfViewerWindow.addEventListener("dblclick", function(event){
@@ -83,7 +85,7 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
         } else{
           anchor = {
             $doc_name : pdfFileName,
-            $doc_path : pdfFileName,
+            $doc_path : pdfFilePath,
             $pdf_quads : quads,
             $pdf_page: page,
             $file_type: "pdf",
@@ -115,7 +117,7 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
           } else{
             anchor = {
               $doc_name : pdfFileName,
-              $doc_path : pdfFileName,
+              $doc_path : pdfFilePath,
               $pdf_quads : quads,
               $pdf_page: page,
               $file_type: "pdf",
@@ -148,7 +150,7 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
         } else{
           anchor = {
             $doc_name : pdfFileName,
-            $doc_path : pdfFileName,
+            $doc_path : pdfFilePath,
             $pdf_quads : quads,
             $pdf_page: page,
             $file_type: "pdf",
@@ -166,7 +168,7 @@ function createPDFViewer(pdfFileName, pageNumber=1, quads, link_id, appBasePath)
 
       ipcRenderer.on('internal-link-step7', (event, data) => {
         console.log("internal-link-step7, received saved link "+JSON.stringify(data))
-        highlightQuads(Annotations, annotManager,data.anchor_1.$pdf_quads,data.link_id,data.anchor_id_2,false)
+        highlightQuads(Annotations, annotManager,data.anchor_1.$pdf_quads,data.link_id,data.anchor_id_1,false)
       });
 
       ipcRenderer.on('updateTempLinks', (event, arg) => {

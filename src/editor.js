@@ -17,6 +17,7 @@ ipcRenderer.on('saveTextAsHTML', (event, data) => {
     let content = document.getElementById('textBox').innerHTML
     let anchors = Array.from(document.getElementById('textBox').getElementsByTagName('a'))
     let linkList = []
+    console.log("anchors"+JSON.stringify(anchors))
     anchors.forEach(x => {
         onclickfuntion = x.getAttribute('onclick')
         //callinternalLink("+data.link_id+", "+data.anchor_id_1+");"
@@ -28,6 +29,7 @@ ipcRenderer.on('saveTextAsHTML', (event, data) => {
         }
         linkList.push(link)
     })
+    console.log("linkList"+JSON.stringify(linkList))
 
     fs.writeFile(filepath, content, (err) => {
         if (err) {
@@ -35,7 +37,7 @@ ipcRenderer.on('saveTextAsHTML', (event, data) => {
             console.log(err);
         }else{
             newData = {
-                filePath: data,
+                filePathFull: data,
                 linkList: linkList
             }
             console.log("saving document with all this data: "+ JSON.stringify(newData))
@@ -92,15 +94,12 @@ ipcRenderer.on('internal-link-step3', (event, data) => {//sent from main.js. bas
             console.log("current window id: "+data.windowId_2)
             console.log("creating link "+JSON.stringify(data.anchor_1))
             console.log("creating link "+JSON.stringify(data.anchor_2))
-            db.createLinkWithAnchors("default","default",data.anchor_1,data.anchor_2).then( (link_ids) => {
-                data.link_id = link_ids.link_id
-                data.anchor_id_1 = link_ids.anchor_id_1
-                data.anchor_id_2 = link_ids.anchor_id_2
-                ipcRenderer.send('internal-link-step5', data) //give other window all the data
 
+            ipcRenderer.send('internal-link-step5', data) //give other window all the data & save
+
+            ipcRenderer.on('internal-link-step8', (event, data) => {
                 linkingFunction = "callinternalLink("+data.link_id+", "+data.anchor_id_2+");"
                 newTextElement.setAttribute('onclick',linkingFunction)
-
                 if (text.rangeCount) {
                     let range = text.getRangeAt(0);
                     range.deleteContents();
@@ -149,13 +148,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 })
 
-
 //has to be put into html editor file
-function callLinkedLinks(linkID){
-    ipcRenderer.send('call-linked-links',linkID);
-}
-
-//has to be put into html editor file
-function callinternalLink(linkID){
-    ipcRenderer.send('call-pdf-link',linkID);
+function callinternalLink(link_id, anchor_id){
+    data = {
+        link_id : link_id,
+        link_id : anchor_id
+    }
+    ipcRenderer.send('openOtherLink',data);
 }

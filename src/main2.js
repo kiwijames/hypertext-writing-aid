@@ -1,8 +1,9 @@
-const { app, BrowserWindow, webContents, ipcMain, dialog, Menu } = require('electron')
-const fs = require('fs')
+const { app, BrowserWindow, webContents, ipcMain, dialog, Menu } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
-const Database = require('./database.js')
+const Database = require('./database.js');
+const prompt = require('electron-multi-prompt');
 
 // one instance only
 const gotTheLock = app.requestSingleInstanceLock()
@@ -46,6 +47,7 @@ function createHTMLWindow(HTMLFilePath, doc_path='') {
       webSecurity: false
     }
   })
+  if(doc_path) win.setTitle("Hypertext Writing Aid - "+path.basename(doc_path))
   win.loadFile(HTMLFilePath)
   win.webContents.openDevTools()
   win.on('close', () => {
@@ -60,11 +62,11 @@ function createHTMLWindow(HTMLFilePath, doc_path='') {
     if(doc_path!=''){
       console.log("did-finish-load "+doc_path)
       win.send('loadText', doc_path)
-      documentWindowMap[HTMLFilePath] = null
+      //if(doc_path) documentWindowMap[path.basename(doc_path)] = null
     }
   })
-  documentWindowMap[HTMLFilePath] = win
   windowEditorList.push(win)
+  if(doc_path) documentWindowMap[path.basename(doc_path)] = win
   return win
 }
 
@@ -84,7 +86,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
       nodeIntegration:true,
       webSecurity: false
   }});
-  win.setTitle(path.basename(pdfFilePath))
+  win.setTitle("Hypertext Writing Aid - "+path.basename(pdfFilePath))
   win.setMenu(menuPDF)
   //win.setMenuBarVisibility(false)
   win.loadFile('public/template.html')
@@ -98,10 +100,10 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     // Dereference the window object from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
     win = null
-    documentWindowMap[pdfFilePath] = null
+    documentWindowMap[path.basename(pdfFilePath)] = null
   })
   windowPDFList.push(win)
-  documentWindowMap[pdfFilePath] = win
+  documentWindowMap[path.basename(pdfFilePath)] = win
   return win
 }
 
@@ -141,7 +143,14 @@ const menu = Menu.buildFromTemplate([
               { name: "All Files", extensions: ["*"] }
               ]
             })
-          if(filePath) currentWindow.send('loadText',filePath[0])
+          if(filePath) {
+            Object.entries(documentWindowMap).forEach((filename, win) => {
+              if(win==currentWindow) documentWindowMap[filename]=null
+            })
+            documentWindowMap[path.basename(filePath[0])] = currentWindow
+            currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
+            currentWindow.send('loadText',filePath[0])
+          }
         }
       },
       {
@@ -223,15 +232,9 @@ const menuPDF = Menu.buildFromTemplate([
     label: 'View',
     submenu: [
       {
-        label: 'View PDF Links',
+        label: 'View All Links',
         click: function() {
-          createHTMLWindow('public/linked-list.html')
-        }
-      },
-      {
-        label: 'View Internal Links',
-        click: function() {
-          createHTMLWindow('public/internal-linked-list.html') 
+          createHTMLWindow('public/linked-list.html') 
         }
       }
     ]
@@ -315,11 +318,9 @@ app.on('ready', () => {
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
-    // check table if dead internal links exist
     db.deleteTemporaryLinks()
     db.closeDatabase()
-    //if(global.sharedObj.database) global.sharedObj.database.close();
-
+    global.sharedObj.database = null
 
     // On macOS it is common for applications and their menu bar
     // to stay active until the user quits explicitly with Cmd + Q
@@ -340,24 +341,36 @@ ipcMain.on('pdf-link-step2', (event, data) => {
 ipcMain.on('pdf-link-step5', (event, data) => {
   menuPDF.getMenuItemById('finishPdfLink').enabled = false
   console.log("\n\nsaving pdf links"+JSON.stringify(data))
-    db.createLinkWithAnchors("default", "default", data.anchor_1, data.anchor_2).then( (link_ids) => {
+  prompt(linkSavingPromptOptions, BrowserWindow.fromId(data.windowId_2))
+  .then((result) => {
+    if (result) {
+      console.log('obtained result', result)
+      db.createLinkWithAnchors(result["link_name"], result["link_description"], data.anchor_1, data.anchor_2).then( (link_ids) => {
       data.link_id = link_ids.link_id
       data.anchor_id_1 = link_ids.anchor_id_1
       data.anchor_id_2 = link_ids.anchor_id_2
       BrowserWindow.fromId(data.windowId_1).webContents.send('pdf-link-step6', data)
       BrowserWindow.fromId(data.windowId_2).webContents.send('pdf-link-step7', data)
     })
-    
+    } else {
+      // in this case the window has been closed or the input are null
+    }
+  })
+  .catch((error) => {
+    console.log('problem occured in the prompt saving the link', error);
+  })    
 });
 
 ipcMain.on('openOtherLink', (event, data) => {
   console.log("openOtherLink clicked: "+JSON.stringify(data))
   db.getOtherAnchorData(data.link_id, data.anchor_id).then( (data) => {
-    console.log("db returned data" + JSON.stringify(data))
+    console.log("db returned data " + JSON.stringify(data))
+    console.log("documentWindowMap keys " + JSON.stringify(Object.keys(documentWindowMap)))
     if(documentWindowMap[data.doc_name]) documentWindowMap[data.doc_name].focus()
     else{
       //to change path.join(data.doc_path,data.doc_name)
-      createPDFWindow(data.doc_name)
+      if(data.file_type == "pdf") createPDFWindow(path.join(data.doc_path,data.doc_name),data.pdf_page)
+      else createHTMLWindow("public/editor.html", path.join(data.doc_path,data.doc_name))
     }
   })
 });
@@ -370,8 +383,23 @@ ipcMain.on('internal-link-step2', (event, data) => {
 });
 
 ipcMain.on('internal-link-step5', (event, data) => {
-  console.log("internal-link-step5" + JSON.stringify(data))
-  BrowserWindow.fromId(data.windowId_1).webContents.send('internal-link-step7', data)
+  prompt(linkSavingPromptOptions, BrowserWindow.fromId(data.windowId_2)).then((result) => {
+    if (result) {
+      db.createLinkWithAnchors(result["link_name"],result["link_description"],data.anchor_1,data.anchor_2).then( (link_ids) => {
+        data.link_id = link_ids.link_id
+        data.anchor_id_1 = link_ids.anchor_id_1
+        data.anchor_id_2 = link_ids.anchor_id_2
+        console.log("internal-link-step5" + JSON.stringify(data))
+        event.sender.webContents.send('internal-link-step8', data)
+        BrowserWindow.fromId(data.windowId_1).webContents.send('internal-link-step7', data)
+      })
+    } else {
+        //do sth
+    }
+
+  }).catch((error) => {
+    console.log('problem occured in the prompt saving the link', error);
+  })  
 });
 
 ipcMain.on('save-link', (event, data) => {
@@ -414,11 +442,52 @@ ipcMain.on('deleteLink', (event, link_id) => {
 
 ipcMain.on('saveTextAsHTML-step2',(event, data) => {
   //data = file path and internalLinkIdList
+  data.filePath = path.dirname(data.filePathFull)
+  data.fileName = path.basename(data.filePathFull)
   console.log("need to put links with this data "+JSON.stringify(data))
-  data.filePath
   data.linkList.forEach(link => {
-    db.updateTemporaryAnchors(link.link_id, link.anchor_id,data.filePath,data.filePath,"","")
+    db.updateTemporaryAnchors(link.link_id,link.anchor_id,data.fileName,data.filePath)
   })
   //update links in pdf-viewers
 });
 
+/////////////////////////////////////////
+const linkSavingPromptOptions = {
+  title: 'Save Link',    
+  label: 'Please input the values to describe the link.',
+  alwaysOnTop: true, //allow the prompt window to stay over the main Window,
+  type: 'multi-input',
+  width: 580, // window width
+  height: 300, // window height
+  resizable: true,
+  buttonsStyle: {
+    texts: {
+      ok_text: 'Save', //text for ok button
+      cancel_text: 'Throw away' //text for cancel button
+    }
+  },   
+  // input multi-input options **NEEDED ONLY IF TYPE IS MULTI-INPUT**
+
+  inputArray: [
+    {
+      key: 'link_name',
+      label: 'Link Name',
+      value: '',
+      attributes: { // Optionals attributes for input
+        placeholder: 'some link name',
+        required: false, // If there is a missing required input the result will be null, the required input will be recognized from '*'
+        type: 'text',
+      }
+    },{
+      key: 'link_description',
+      label: 'Link Description',
+      value: '',
+      attributes: { // Optionals attributes for input
+        placeholder: 'a description',
+        required: false, // If there is a missing required input the result will be null, the required input will be recognized from '*'
+        type: 'text',
+      }
+    }
+  ]
+
+}

@@ -46,11 +46,11 @@ module.exports = class Database {
         this.db.close()
     }
     
-    updateTemporaryAnchors(link_id, anchor_id, doc_name, doc_path, doc_position, anchor_text){
+    updateTemporaryAnchors(link_id, anchor_id, doc_name, doc_path){
         this.db.run("UPDATE anchor \
-        SET doc_name = ?, doc_path = ?, doc_position = ?, anchor_text = ? \
+        SET doc_name = ?, doc_path = ? \
         WHERE anchor.anchor_id = ?", 
-        doc_name, doc_path, doc_position, anchor_text, anchor_id, function (err) {
+        doc_name, doc_path, anchor_id, function (err) {
             if(err) {
                 console.log("error "+err)
             }
@@ -58,6 +58,8 @@ module.exports = class Database {
 }   
 
     createLinkWithAnchors(link_name, link_description, anchor_1, anchor_2){
+        console.log("createLinkWithAnchors ANCHOR1 "+JSON.stringify(anchor_1))
+        console.log("createLinkWithAnchors ANCHOR2 "+JSON.stringify(anchor_2))
         return new Promise( (resolve,reject) => {
             console.log("createLinkWithAnchors called")
             this.createAnchor(anchor_1).then( (anchor_id_1) => {
@@ -134,8 +136,8 @@ module.exports = class Database {
         console.log("getting all links")
         return new Promise((resolve,reject) => {
             this.db.all("SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, \
-            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, \
-            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2 \
+            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, \
+            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2 \
             FROM link l\
             INNER JOIN anchor AS a1 ON a1.anchor_id = l.anchor_id_1 \
             INNER JOIN anchor AS a2 ON a2.anchor_id = l.anchor_id_2", (err,rows) => {

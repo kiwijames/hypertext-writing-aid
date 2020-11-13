@@ -155,19 +155,18 @@ img.intLink { border: 0; }
 </div>
 <!--</form>-->
 <script>
+  const { ipcRenderer } = require('electron');
 require('../src/editor.js');
 function createDocumentLink(){
-  const { ipcRenderer } = require('electron');
   let data = "link clicked"
   ipcRenderer.send('linking-action', data); 
 }
-function callLinkedLinks(linkID){
-  const { ipcRenderer } = require('electron');
-  ipcRenderer.send('call-linked-links',linkID);
-}
-function callinternalLink(linkID){
-  const { ipcRenderer } = require('electron');
-    ipcRenderer.send('call-pdf-link',linkID);
+function callinternalLink(link_id, anchor_id){
+    data = {
+        link_id : link_id,
+        anchor_id : anchor_id
+    }
+    ipcRenderer.send('openOtherLink',data);
 }
 </script>
 </body>
