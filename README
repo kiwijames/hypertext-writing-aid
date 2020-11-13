@@ -4,9 +4,8 @@ The starting point gave the template of the pdftron Viewer. (license to be check
 TODOS:
  - allow the user to decide which link to follow (thus support when multiple annoations of same)
  - allow user to decide to open new document on same-document-link
- - document id/name mapping for name-changes or missing docs
 
- TODISCUSS:
+ TO DISCUSS in theory:
  - import file by url
  - share links
  - save arrangement
