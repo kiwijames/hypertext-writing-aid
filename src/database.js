@@ -46,6 +46,33 @@ module.exports = class Database {
         this.db.close()
     }
     
+    deleteLinksWithFilePath(fileName){
+        let deleteStatement = "DELETE FROM link\
+            WHERE anchor_id_1 IN (SELECT a1.anchor_id FROM anchor a1 WHERE a1.doc_name = ?) \
+            OR anchor_id_2 IN (SELECT a2.anchor_id FROM anchor a2 WHERE a2.doc_name = ?)"
+        let deleteSTatement2 = "DELETE FROM anchor WHERE doc_name = ?"
+        this.db.run(deleteStatement, fileName, fileName, function(err){
+            if(err) console.error("Error occured when trying to delete link ",err)
+            else console.debug("Finished deleting link")
+        });
+        this.db.run(deleteSTatement2, fileName, function(err){
+            if(err) console.error("Error occured when trying to delete link ",err)
+            else console.debug("Finished deleting anchor")
+        });
+    }
+
+    updateFilePathForAllAnchors(doc_name, doc_path){
+        this.db.run("UPDATE anchor \
+        SET doc_name = ?, doc_path = ? \
+        WHERE doc_name = ?", 
+        doc_name, doc_path, doc_name, function (err) {
+            if(err) {
+                console.log("error "+err)
+            }
+        })
+    }   
+
+
     updateTemporaryAnchors(link_id, anchor_id, doc_name, doc_path){
         this.db.run("UPDATE anchor \
         SET doc_name = ?, doc_path = ? \
@@ -55,7 +82,7 @@ module.exports = class Database {
                 console.log("error "+err)
             }
         })
-}   
+    }   
 
     createLinkWithAnchors(link_name, link_description, anchor_1, anchor_2){
         console.log("createLinkWithAnchors ANCHOR1 "+JSON.stringify(anchor_1))
@@ -130,8 +157,24 @@ module.exports = class Database {
     /**
     * Returns a promise returning all links with anchor data
     * @return  {[Object]} list of sqlite3 database objects
-    */
-         
+    */  
+    getAllAnchors(){
+        return new Promise((resolve,reject) => {
+            this.db.all("SELECT * from anchor", (err,rows) => {
+                if(err) {
+                    console.log(err)
+                    reject(err)
+                }
+                else resolve(rows)
+            })
+        })
+    }
+
+
+    /**
+    * Returns a promise returning all links with anchor data
+    * @return  {[Object]} list of sqlite3 database objects
+    */  
     getAllLinks(){
         console.log("getting all links")
         return new Promise((resolve,reject) => {

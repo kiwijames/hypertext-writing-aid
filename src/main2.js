@@ -277,7 +277,7 @@ const menuPDF = Menu.buildFromTemplate([
 //Set Menu for all windows, since mac doesnt allow individual window menus
 Menu.setApplicationMenu(menu);
 
-////////////////////////////app event handeling////////////////////////////////////////
+////////////////////////////////////////Application Event Handeling////////////////////////////////////////
 
 // Create main window when ready
 app.on('second-instance', (event, commandLine, workingDirectory) => {
@@ -298,23 +298,68 @@ app.on('second-instance', (event, commandLine, workingDirectory) => {
 })
 
 app.on('ready', () => {
-  
-    // If app is opend on windows by opening a file 
-    if (process.platform == 'win32' && process.argv.length >= 2) {
-      let openFilePath = process.argv[1];
-      let fileExtension = path.extname(openFilePath)
-      if (openFilePath !== "" && openFilePath.includes("pdf")) {
-        try{
-          console.log(openFilePath);
-          createPDFWindow(openFilePath)}
-        catch(e){
-          dialog.showErrorBox("opening pdf problem", e + " und datei: "+openFilePath)
-        }
+  // If app is opend on windows by opening a file 
+  if (process.platform == 'win32' && process.argv.length >= 2) {
+    let openFilePath = process.argv[1];
+    let fileExtension = path.extname(openFilePath)
+    if (openFilePath !== "" && openFilePath.includes("pdf")) {
+      try{
+        console.log(openFilePath);
+        createPDFWindow(openFilePath)}
+      catch(e){
+        dialog.showErrorBox("opening pdf problem", e + " und datei: "+openFilePath)
       }
     }
+  }
+
+  if(windowPDFList.length == 0) editorWindow = createHTMLWindow('public/editor.html')
+
+
+    //Check if files moved
+    db.getAllAnchors().then( (rows) => {
+      fullFilePathList = []
+      rows.forEach( (row) => {
+        fullFilePath = path.join(row.doc_path,row.doc_name)
+        if(!fullFilePathList.includes(fullFilePath)) fullFilePathList.push(fullFilePath)
+      })
+      missingDocs = []
+      fullFilePathList.forEach( (filePath) => {
+        if(!fs.existsSync(filePath)){
+          missingDocs.push(filePath)
+        }
+      })
+      console.log("missingDocs: "+JSON.stringify(missingDocs))
+
+      missingDocs.forEach( (filePath) => {
+        let dialogOptions = {
+          type: 'info',
+          buttons: ['Set new file path', 'Remove links'],
+          defaultId: 1,
+          title: 'File not found',
+          message: 'A file with links has been moved, deleted or renamed.',
+          detail: filePath+' has not been found. Please set the new path to the file, otherwise the links will be removed.',
+        };
+        dialog.showMessageBox(null, dialogOptions, (response) => {
+          if(response == 0) {
+            newFilePath = dialog.showOpenDialog({ 
+              properties: ['openFile'],
+              filters: [
+                { name: "All Files", extensions: ["*"] }
+              ]
+            })
+            if(newFilePath) {
+              newFilePath = newFilePath[0]
+              db.updateFilePathForAllAnchors(path.basename(newFilePath),path.dirname(newFilePath),path.basename(newFilePath))
+            }
+            else db.deleteLinksWithFilePath(path.basename(filePath))
+          }else {
+            db.deleteLinksWithFilePath(path.basename(filePath))
+          }
+        });
+      })
+    })
     
-    if(windowPDFList.length == 0) editorWindow = createHTMLWindow('public/editor.html')
-})
+  })
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
@@ -329,7 +374,7 @@ app.on('window-all-closed', () => {
     }
 })
 
-////////////////////////////message handeling////////////////////////////////////////
+////////////////////////////////////////Message Handeling////////////////////////////////////////
 
 ipcMain.on('pdf-link-step2', (event, data) => {
     console.log("pdf-link-step2 " + JSON.stringify(data))
@@ -402,26 +447,6 @@ ipcMain.on('internal-link-step5', (event, data) => {
   })  
 });
 
-ipcMain.on('save-link', (event, data) => {
-  linkData.linkName = data.linkName
-  let insertStatement = "INSERT INTO links(link_name,document_name_1,\
-                          document_data_1,document_quads_1,document_name_2,document_data_2,document_quads_2) \
-                          VALUES('"+linkData.linkName+"','"+linkData.docName1+"','"+linkData.pageNumber1+"','"+linkData.pageSelection1+"','"+linkData.docName2+"','"+linkData.pageNumber2+"','"+linkData.pageSelection2+"')"
-  
-  //let db = new sqlite3.Database('mydatabase.sqlite')
-  global.sharedObj.database.run(insertStatement, function(err){
-    if(err){
-      console.log(err)
-    }else{
-      lastLinkId = this.lastID
-      console.log("last_insert_rowid row: "+lastLinkId)
-      windowPDFList.map(window => {
-        window.webContents.send('updateTempLinks', lastLinkId)
-      });
-    }
-  });
-});
-
 ipcMain.on('requireLinkId', (event, arg) => {
   let windowThatWantsLink = event.sender
   console.log("start requireLinkId")
@@ -452,6 +477,8 @@ ipcMain.on('saveTextAsHTML-step2',(event, data) => {
 });
 
 /////////////////////////////////////////
+
+
 const linkSavingPromptOptions = {
   title: 'Save Link',    
   label: 'Please input the values to describe the link.',
