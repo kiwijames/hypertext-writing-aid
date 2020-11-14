@@ -319,9 +319,10 @@ const createLinkTable = 'CREATE TABLE link (\
     anchor_id_1 INTEGER NOT NULL,\
     anchor_id_2 INTEGER NOT NULL,\
     creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\
-    FOREIGN KEY(anchor_id_1) REFERENCES anchor(anchor_id),\
-    FOREIGN KEY(anchor_id_2) REFERENCES anchor(anchor_id)\
+    FOREIGN KEY(anchor_id_1) REFERENCES anchor(anchor_id) ON DELETE CASCADE,\
+    FOREIGN KEY(anchor_id_2) REFERENCES anchor(anchor_id) ON DELETE CASCADE\
     );'
+//ON DELETE CASCADE\
 
 const createAnchorTable = 'CREATE TABLE anchor (\
     anchor_id INTEGER PRIMARY KEY AUTOINCREMENT,\

@@ -2,13 +2,4 @@ This program is for my master thesis.
 The starting point gave the template of the pdftron Viewer. (license to be checked)
 
 TODOS:
- - check last_modified of docs
- - allow the user to decide which link to follow (thus support when multiple annoations of same)
- - allow user to decide to open new document on same-document-link
- - generalise link making with buttons in menu
- - delete cascase link-anchor table
-
- TO DISCUSS in theory:
- - import file by url
- - share links
- - save arrangement
+ - generalise link making with buttons (Start & End)
