@@ -63,7 +63,7 @@ function createPDFViewer(
               link_id: link_id,
               anchor_id: anchor_id,
             };
-            ipcRenderer.send("openOtherLink", data);
+            ipcRenderer.send("open-other-link", data);
           });
         }
       });
