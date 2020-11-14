@@ -1,31 +1,24 @@
 const {ipcRenderer, remote, app} = require('electron');
 const path = require('path');
-console.debug("pdf-viewer.js loaded")
-var data
-const sqlite3 = require('sqlite3').verbose();
-const Database = require('./database.js')
-
 const appBasePath = remote.app.getAppPath()
-const appUserPath = remote.app.getPath("userData")
-const dbFileName = 'mydatabase.sqlite'
-const fullDbPath = path.join(appUserPath,dbFileName)
-//const db = new sqlite3.Database(fullDbPath)
-var db = remote.getGlobal('sharedObj').db
+const db = remote.getGlobal('sharedObj').db
 
-//Wait for pdfFile to be given
+/**
+ * Renderer gets sent the pdf file when ready
+ */
 ipcRenderer.once('pdfFile', (event, pdfFile, pageNumber, quads, link_id) => {
   var pdfFilePathFull = path.resolve(pdfFile)
-
-  // putting vars into debug log
-    console.debug("baseBath: "+appBasePath)
-    console.debug("linkid: "+link_id)
-    console.debug("received pdfFile "+pdfFilePathFull)
-    console.debug("received pageNumber "+pageNumber)
-    console.debug("received quads: "+JSON.stringify(quads))
   createPDFViewer(pdfFilePathFull, pageNumber, quads, link_id, appBasePath)
 });
 
-// All functionality inside, so it starts when document finished loading
+/**
+* Loads the pdf viewer
+* @param  {String} pdfFilePathFull Full file path of the pdf document
+* @param  {Number} pageNumber Page number to be opend
+* @param  {Object} quads Quads of text
+* @param  {Number} link_id Link ID
+* @param  {String} appBasePath base path of the application because PdfTRON Webviewer needs to be loaded
+*/
 function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBasePath){
   var pdfFileName = path.basename(pdfFilePathFull)
   var pdfFilePath = path.dirname(pdfFilePathFull)
@@ -37,19 +30,14 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
     initialDoc: pdfFilePathFull,
   }, viewerElement).then(instance => {
     console.debug("pdf-viewer.js viewer ready")
-    // Interact with APIs here.
+    // Interact with APIs here, 
     // See https://www.pdftron.com/documentation/web/guides/basic-functionality for more info/
     const { Annotations, annotManager, docViewer } = instance;
-    // wait until the PDF finished loading
     docViewer.on('documentLoaded', () => {
-      // ~10 Sekunden bis hier hin vom window start; scheint wohl an pdf und rechner speed zu liegen
+      // Can take up to ~10 seconds on slow devices
       console.debug("pdf-viewer.js document ready")
-      // Viewer properties
       docViewer.setCurrentPage(pageNumber)
-      //docViewer.setFitMode("FitWidth") //not a function..?
-
       loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName)
-
       pdfViewerWindow = document.getElementById('webviewer-1').contentWindow; //assuming webviewer-1 is allways there
       pdfViewerWindow.addEventListener("dblclick", function(event){
         console.log("clicked event inside getAnnotations")
@@ -57,7 +45,6 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
         if(annoList){
           //implement let user choose
           annoList.forEach(annot =>{
-            //check if i is in linkId
             let link_id = ""+annot.getCustomData('link_id')
             let anchor_id = ""+annot.getCustomData('anchor_id')
             console.log("link double clicked: "+link_id+", "+anchor_id)
@@ -75,104 +62,6 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
         docViewer.setCurrentPage(arg)
       });
 
-      ipcRenderer.on('pdf-link-step1', (event, arg) => {
-        // more information on quads https://www.pdftron.com/documentation/web/guides/extraction/selected-text/
-        let page = docViewer.getCurrentPage();
-        let quads = docViewer.getSelectedTextQuads();
-        let text = docViewer.getSelectedText();
-        if(quads==null){
-          alert("Please select the text to link.")
-        } else{
-          anchor = {
-            $doc_name : pdfFileName,
-            $doc_path : pdfFilePath,
-            $pdf_quads : quads,
-            $pdf_page: page,
-            $file_type: "pdf",
-            $anchor_text : text,
-            $doc_position : "",
-            $last_modified : "", // doesnt matter, because pdf
-          }
-          data = {
-            anchor_1 : anchor,
-            windowId_1 : remote.getCurrentWindow().id
-          }
-          alert("sth. selcted, next selection")
-          //TODO highlightQuads(Annotations, annotManager, allQuads, null, true)
-
-          ipcRenderer.send('pdf-link-step2', data);
-        }
-      });
-
-      ipcRenderer.on('pdf-link-step3', (event, data) => {
-        anchors = data
-        ipcRenderer.on('pdf-link-step4', (event, arg) => {
-          if(arg) return
-          // more information on quads https://www.pdftron.com/documentation/web/guides/extraction/selected-text/
-          let page = docViewer.getCurrentPage();
-          let quads = docViewer.getSelectedTextQuads();
-          let text = docViewer.getSelectedText();
-          if(quads==null){
-            alert("Please select the text to link.")
-          } else{
-            anchor = {
-              $doc_name : pdfFileName,
-              $doc_path : pdfFilePath,
-              $pdf_quads : quads,
-              $pdf_page: page,
-              $file_type: "pdf",
-              $anchor_text : text,
-              $doc_position : "",
-              $last_modified : "", // doesnt matter, because pdf
-            }
-            anchors.anchor_2 = anchor
-            anchors.windowId_2 = remote.getCurrentWindow().id
-            alert("sth. selcted, saving link")
-            ipcRenderer.send('pdf-link-step5', anchors);
-          }
-        });
-      });
-
-      ipcRenderer.on('pdf-link-step6', (event, data) => {
-        console.log("data: "+JSON.stringify(data))
-        highlightQuads(Annotations,annotManager,data.anchor_1.$pdf_quads,data.link_id,data.anchor_id_2,false)
-      })
-      ipcRenderer.on('pdf-link-step7', (event, data) => { 
-        console.log("data: "+JSON.stringify(data))
-        highlightQuads(Annotations,annotManager,data.anchor_2.$pdf_quads,data.link_id,data.anchor_id_1,false)
-      })
-
-      ipcRenderer.on('internal-link-step1', (event, arg) => {        
-        let page = docViewer.getCurrentPage();
-        let quads = docViewer.getSelectedTextQuads();
-        let text = docViewer.getSelectedText();
-        if(quads==null){
-          alert("Please select the text to be linked.")
-        } else{
-          anchor = {
-            $doc_name : pdfFileName,
-            $doc_path : pdfFilePath,
-            $pdf_quads : quads,
-            $pdf_page: page,
-            $file_type: "pdf",
-            $anchor_text : text,
-            $doc_position : "", // empty, because pdf
-            $last_modified : "", // empty matter, because pdf
-          }
-          data = {
-            anchor_1: anchor,
-            windowId_1: remote.getCurrentWindow().id
-          }
-          alert("sth. selcted")
-          ipcRenderer.send('internal-link-step2', data);
-        }
-      });
-
-      ipcRenderer.on('internal-link-step7', (event, data) => {
-        console.log("internal-link-step7, received saved link "+JSON.stringify(data))
-        highlightQuads(Annotations, annotManager,data.anchor_1.$pdf_quads,data.link_id,data.anchor_id_1,false)
-      });
-
       ipcRenderer.on('updateTempLinks', (event, arg) => {
         let link_id = arg
         //update all annotations without link_id with this
@@ -185,15 +74,11 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
           }
         });
       });
-      
-
 
       ipcRenderer.on('forward-anchor', (event) => {  
         event.sender.send('forward-anchor');
       })
       
-
-
       ipcRenderer.on('get-anchor', (event, data) => {        
         let page = docViewer.getCurrentPage();
         let quads = docViewer.getSelectedTextQuads();
@@ -224,6 +109,7 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
           event.sender.send('send-anchor', data);
         }
       });
+
       ipcRenderer.on('put-link', (event, data) => {     
         console.log("receiving put link: "+JSON.stringify(data))
         if(data.anchor_1.$doc_name == pdfFileName){
@@ -234,17 +120,23 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
         }
         
       });
-    })//PDFDocumentLoaded function end
+    })
   })
 }
 
 
-
+/**
+* Loads all the anchors for a given pdf and creates links/highlights
+* @param  {Object} Annotations Annotations object
+* @param  {Object} annotManager Annotation Manager object
+* @param  {Object} quads quads to be highlighted
+* @param  {Number} link_id Link ID put into the annotation/link
+* @param  {Number} anchor_id Anchor ID put into the annotation/link
+*/
 function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id) {
   let highlights = []
   if(typeof(quads) == "string") quads = JSON.parse(quads)
   let pageNumbers = Object.keys(quads)
-  
   pageNumbers.forEach( num => {
     let highlight = new Annotations.TextHighlightAnnotation();
     highlight.PageNumber=num
@@ -259,13 +151,14 @@ function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id) {
 
 
 
-//write all annotations from the database into the pdf,  only pdf to pdf 
+/**
+* Loads all the anchors for a given pdf and creates links/highlights
+* @param  {Object} Annotations Annotations object
+* @param  {Object} annotManager Annotation Manager object
+* @param  {String} pdfFileName File name of the opend pdf
+*/
 function loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName){
-  db.getAllAnchorsForDoc(pdfFileName).then((rows) => { //ONLY THE DOCUMENT NAME //HOW TO CHECK FOR ERRORS?
-    //if(rows) return console.debug("there might be a problem here")
-    console.log("pdfFileName: "+pdfFileName)
-    console.log("rows: "+JSON.stringify(rows))
-    //console.log("number of rows: "+rows.length())
+  db.getAllAnchorsForDoc(pdfFileName).then((rows) => {
     rows.forEach((row) => {
       console.log("reihe "+row)
       quads = JSON.parse(row.pdf_quads)

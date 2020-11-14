@@ -14,16 +14,13 @@ if(!gotTheLock) {
 const appBasePath = app.getAppPath()
 const appUserPath = app.getPath("userData")
 const dbFileName = 'mydatabase.sqlite'
-const fullDbPath = path.join(appUserPath,dbFileName)
 var db = new Database(appUserPath,dbFileName)
 global.sharedObj = {db: db}
-//todo db loading with promises and global sharing
 
 let windowPDFList = []
 let documentWindowMap = {} //path to win - win mapping
 let idEditorMap = {} //path to win - win mapping
 let windowEditorList = []
-let editorWindow  
 
 
 ////////////////////////////create window functions////////////////////////////
@@ -157,7 +154,7 @@ app.on('ready', () => {
     }
   }
 
-  if(windowPDFList.length == 0) editorWindow = createEditorWindow('public/editor.html')
+  if(windowPDFList.length == 0) createEditorWindow('public/editor.html')
 
 
     //Check if files moved or modified
@@ -245,36 +242,6 @@ app.on('window-all-closed', () => {
 
 ////////////////////////////////////////Message Handeling////////////////////////////////////////
 
-ipcMain.on('pdf-link-step2', (event, data) => {
-    console.log("pdf-link-step2 " + JSON.stringify(data))
-    menuPDF.getMenuItemById('finishPdfLink').enabled = true
-    windowPDFList.forEach(w => w.send('pdf-link-step3', data))
-    //event.sender.webContents.send('pdf-link-step3',data) when sending the menu message, exclude the other
-});
-
-ipcMain.on('pdf-link-step5', (event, data) => {
-  menuPDF.getMenuItemById('finishPdfLink').enabled = false
-  console.log("\n\nsaving pdf links"+JSON.stringify(data))
-  prompt(linkSavingPromptOptions, BrowserWindow.fromId(data.windowId_2))
-  .then((result) => {
-    if (result) {
-      console.log('obtained result', result)
-      db.createLinkWithAnchors(result["link_name"], result["link_description"], data.anchor_1, data.anchor_2).then( (link_ids) => {
-      data.link_id = link_ids.link_id
-      data.anchor_id_1 = link_ids.anchor_id_1
-      data.anchor_id_2 = link_ids.anchor_id_2
-      BrowserWindow.fromId(data.windowId_1).webContents.send('pdf-link-step6', data)
-      BrowserWindow.fromId(data.windowId_2).webContents.send('pdf-link-step7', data)
-    })
-    } else {
-      // in this case the window has been closed or the input are null
-    }
-  })
-  .catch((error) => {
-    console.log('problem occured in the prompt saving the link', error);
-  })    
-});
-
 ipcMain.on('openOtherLink', (event, data) => {
   console.log("openOtherLink clicked: "+JSON.stringify(data))
   db.getOtherAnchorData(data.link_id, data.anchor_id).then( (data) => {
@@ -287,33 +254,6 @@ ipcMain.on('openOtherLink', (event, data) => {
       else createEditorWindow("public/editor.html", path.join(data.doc_path,data.doc_name))
     }
   })
-});
-
-ipcMain.on('internal-link-step2', (event, data) => {
-  menu.getMenuItemById('putPdfLink').enabled = true
-  console.log("origsenderid "+data.windowId_1)
-  console.log("origsenderid anchor "+data.anchor_1)
-  windowEditorList.forEach(w => w.send('internal-link-step3', data))
-});
-
-ipcMain.on('internal-link-step5', (event, data) => {
-  prompt(linkSavingPromptOptions, BrowserWindow.fromId(data.windowId_2)).then((result) => {
-    if (result) {
-      db.createLinkWithAnchors(result["link_name"],result["link_description"],data.anchor_1,data.anchor_2).then( (link_ids) => {
-        data.link_id = link_ids.link_id
-        data.anchor_id_1 = link_ids.anchor_id_1
-        data.anchor_id_2 = link_ids.anchor_id_2
-        console.log("internal-link-step5" + JSON.stringify(data))
-        event.sender.webContents.send('internal-link-step8', data)
-        BrowserWindow.fromId(data.windowId_1).webContents.send('internal-link-step7', data)
-      }).catch(err => console.log(err))
-    } else {
-        //do sth
-    }
-
-  }).catch((error) => {
-    console.log('problem occured in the prompt saving the link', error);
-  })  
 });
 
 ipcMain.on('saveTextAsHTML-step2',(event, data) => {
