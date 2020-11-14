@@ -147,7 +147,7 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
         let quads = docViewer.getSelectedTextQuads();
         let text = docViewer.getSelectedText();
         if(quads==null){
-          alert("Please select the text to link.")
+          alert("Please select the text to be linked.")
         } else{
           anchor = {
             $doc_name : pdfFileName,
@@ -187,13 +187,60 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
       });
       
 
-    })//PDFDocumentLoaded
+
+      ipcRenderer.on('forward-anchor', (event) => {  
+        event.sender.send('forward-anchor');
+      })
+      
+
+
+      ipcRenderer.on('get-anchor', (event, data) => {        
+        let page = docViewer.getCurrentPage();
+        let quads = docViewer.getSelectedTextQuads();
+        let text = docViewer.getSelectedText();
+        if(quads==null){
+          alert("Please select the text to be linked.")
+        }else {
+          anchor = {
+            $doc_name : pdfFileName,
+            $doc_path : pdfFilePath,
+            $pdf_quads : quads,
+            $pdf_page: page,
+            $file_type: "pdf",
+            $anchor_text : text,
+            $doc_position : "", // empty, because pdf
+            $last_modified : "", // empty, because pdf
+          }
+          if(data && data.anchor_1) {
+            data.anchor_2 = anchor
+            data.windowId_2 = remote.getCurrentWindow().id
+          }else {
+            data = {
+              anchor_1: anchor,
+              windowId_1: remote.getCurrentWindow().id
+            }
+          }
+          alert("'"+text+"' selected.")
+          event.sender.send('send-anchor', data);
+        }
+      });
+      ipcRenderer.on('put-link', (event, data) => {     
+        console.log("receiving put link: "+JSON.stringify(data))
+        if(data.anchor_1.$doc_name == pdfFileName){
+          highlightQuads(Annotations,annotManager,data.anchor_1.$pdf_quads,data.link_id,data.anchor_id_1)
+        }
+        if(data.anchor_2.$doc_name == pdfFileName){
+          highlightQuads(Annotations,annotManager,data.anchor_2.$pdf_quads,data.link_id,data.anchor_id_2)
+        }
+        
+      });
+    })//PDFDocumentLoaded function end
   })
 }
 
 
 
-function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id, tmpFlag) {
+function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id) {
   let highlights = []
   if(typeof(quads) == "string") quads = JSON.parse(quads)
   let pageNumbers = Object.keys(quads)
@@ -202,11 +249,8 @@ function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id, tm
     let highlight = new Annotations.TextHighlightAnnotation();
     highlight.PageNumber=num
     highlight.Quads = quads[num]
-    if(!tmpFlag) {
-      highlight.setCustomData('link_id', link_id)
-      highlight.setCustomData('anchor_id', anchor_id)
-    }
-    else highlight.setCustomData('tmp', true)
+    highlight.setCustomData('link_id', link_id)
+    highlight.setCustomData('anchor_id', anchor_id)
     highlights.push(highlight)
   })
   annotManager.addAnnotation(highlights);

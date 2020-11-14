@@ -115,6 +115,70 @@ ipcRenderer.on('internal-link-step3', (event, data) => {//sent from main.js. bas
 });
 
 
+ipcRenderer.on('forward-anchor', (event) => {  
+    event.sender.send('forward-anchor');
+})
+
+ipcRenderer.on('get-anchor', (event, data) => {
+    let textBox = document.getElementById('textBox')
+    let text = window.getSelection()
+    let newTextElement = document.createElement('a');
+    newTextElement.appendChild(document.createTextNode(text));
+    newTextElement.setAttribute('href',"#")
+
+    if(!textBox.innerText.includes(text) && text.rangeCount){
+        alert('Please select the text to be linked.')
+    }else{
+        anchor = {
+            $doc_name : 'tbd',
+            $doc_path : 'tbd',
+            $pdf_quads : null,
+            $pdf_page: null,
+            $file_type: "text",
+            $anchor_text : ""+text,
+            $doc_position : "tbd",
+            $last_modified : "tbd",
+        }
+        if(data && data.anchor_1) {
+            data.anchor_2 = anchor
+            data.windowId_2 = remote.getCurrentWindow().id
+        }else {
+            data = {
+                anchor_1: anchor,
+                windowId_1: remote.getCurrentWindow().id
+            }
+        }
+        alert("'"+text+"' selected.")
+        ipcRenderer.send('send-anchor', data) //give other window all the data & save
+
+        ipcRenderer.on('put-link', (event, data) => {
+            if(data.anchor_1.$file_type == "text"){
+                linkingFunction = "callinternalLink("+data.link_id+", "+data.anchor_id_1+");"
+                newTextElement.setAttribute('onclick',linkingFunction)
+                let range = text.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(newTextElement);
+            }            
+            if(data.anchor_2.$file_type = "text"){
+                linkingFunction = "callinternalLink("+data.link_id+", "+data.anchor_id_2+");"
+                newTextElement.setAttribute('onclick',linkingFunction)
+                let range = text.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(newTextElement);
+            }
+        });
+    }
+});
+
+
+
+
+
+
+
+
+
+
 
 document.addEventListener('DOMContentLoaded', function() {
     //let linkNameString = document.getElementById('link-name');

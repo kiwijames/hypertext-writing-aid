@@ -26,34 +26,47 @@ let windowEditorList = []
 let editorWindow  
 
 
-////////////////////////////creating functions////////////////////////////////////////
+////////////////////////////create window functions////////////////////////////
 
-
-/**
- * Creates and returns a window,
- * loading a given HTML file.
- * @param  {String} HTMLFilePath Absolute path to a PDF file.
- * @return {BrowserWindow} Window with the PDF in a Viewer.
- */
-function createHTMLWindow(HTMLFilePath, doc_path='') {
-  // Create the browser window.
+function createHTMLWindow(HTMLFilePath) {
   let win = new BrowserWindow({ 
-    width: 630, 
-    //minWidth:630,
-    //maxWidth:630,
-    height: 440 ,
+    width: 800, 
+    height: 600 ,
     webPreferences: {
       nodeIntegration:true,
       webSecurity: false
     }
   })
+  win.setMenuBarVisibility(false)
+  win.loadFile(HTMLFilePath)
+  win.on('close', () => {
+    // Dereference the window object and remove from list
+    win = null
+  })
+  return win
+}
+
+/**
+ * Creates and returns a window,
+ * loading a given HTML file.
+ * @param  {String} HTMLFilePath Absolute path to a PDF file.
+ * @param  {String} doc_path Absolute path to load into editor.
+ * @return {BrowserWindow} Window with the PDF in a Viewer.
+ */
+function createEditorWindow(HTMLFilePath, doc_path='') {
+  let win = new BrowserWindow({ 
+    width: 800, 
+    height: 600 ,
+    webPreferences: {
+      nodeIntegration:true,
+      webSecurity: false
+    }  
+  })
   if(doc_path) win.setTitle("Hypertext Writing Aid - "+path.basename(doc_path))
   win.loadFile(HTMLFilePath)
-  win.webContents.openDevTools()
+  //win.webContents.openDevTools()
   win.on('close', () => {
-    // Dereference the window object, usually you would store windows
-    // in an array if your app supports multi windows, this is the time
-    // when you should delete the corresponding element.
+    // Dereference the window object and remove from list
     windowEditorList = windowEditorList.filter(w => w.id !== win.id)
     win = null
   })
@@ -87,17 +100,16 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
       webSecurity: false
   }});
   win.setTitle("Hypertext Writing Aid - "+path.basename(pdfFilePath))
-  win.setMenu(menuPDF)
   //win.setMenuBarVisibility(false)
   win.loadFile('public/template.html')
   let contents = win.webContents
   contents.on('dom-ready', () => {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
-  // Uncomment DevTools for debugging
-  contents.openDevTools()
+  //Uncomment DevTools for debugging
+  //contents.openDevTools()
   win.on('close', () => {
-    // Dereference the window object from list
+    // Dereference the window object and remove from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
     win = null
     documentWindowMap[path.basename(pdfFilePath)] = null
@@ -106,175 +118,6 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
   documentWindowMap[path.basename(pdfFilePath)] = win
   return win
 }
-
-// Menu template for the main window
-const menu = Menu.buildFromTemplate([
-  {
-      label: 'File',
-      submenu: [
-      {
-          label: 'Open PDF(s)',
-          accelerator: "CmdOrCtrl+o",
-          click: function() {
-            filePaths = dialog.showOpenDialog({ 
-              properties: ['openFile', 'multiSelections'],
-              filters: [
-                { name: "PDF", extensions: ["pdf"] },
-                { name: "All Files", extensions: ["*"] }
-              ]
-            })
-            if(filePaths) filePaths.forEach( (filePath) => { createPDFWindow(filePath); })
-          }
-      }, 
-      {
-        label: 'New Text Edtior',
-        accelerator: "CmdOrCtrl+n",
-        click: function() {
-          createHTMLWindow('public/editor.html')          
-        }
-      }, 
-      {
-        label: 'Import Text',
-        click: function(menuItem, currentWindow) {
-          filePath = dialog.showOpenDialog({ 
-            properties: ['openFile'] ,
-            filters: [
-              { name: "HTML", extensions: ["html", "htm"] },
-              { name: "All Files", extensions: ["*"] }
-              ]
-            })
-          if(filePath) {
-            Object.entries(documentWindowMap).forEach((filename, win) => {
-              if(win==currentWindow) documentWindowMap[filename]=null
-            })
-            documentWindowMap[path.basename(filePath[0])] = currentWindow
-            currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
-            currentWindow.send('loadText',filePath[0])
-          }
-        }
-      },
-      {
-        label: 'Save As',
-        accelerator: "CmdOrCtrl+Shift+s",
-        click: function(menuItem, currentWindow) {
-          let filePath = dialog.showSaveDialog()
-          if(filePath) currentWindow.send('saveTextAsHTML',filePath)
-          // save in database the file location for now
-        }
-      },
-      {
-        label: 'Close All',
-        click: function() {
-          app.quit()
-        }
-      }
-      ]
-  },{
-    label: 'View',
-    submenu: [
-      {
-        label: 'View All Links',
-        click: function() {
-          createHTMLWindow('public/linked-list.html') 
-        }
-      }
-    ]
-  },{
-    label: 'Link',
-    submenu: [
-      {
-        label: 'Put internal link',
-        accelerator: "CmdOrCtrl+i",
-        enabled: false,
-        id: 'putPdfLink',
-        click: function(menuItem, currentWindow) {
-          currentWindow.webContents.send('internal-link-step4')
-          windowEditorList.filter(w => w.id == currentWindow.id).forEach(w => w.send('internal-link-step4',true)) //arg given indicate to stop other events
-          menuItem.enabled = false
-        }
-      }
-    ]
-  }
-]);
-// pdf menu
-const menuPDF = Menu.buildFromTemplate([
-  {
-    label: 'File',
-    submenu: [
-    {
-        label: 'Open PDF(s)',
-        accelerator: "CmdOrCtrl+o",
-        click: function() {
-          filePaths = dialog.showOpenDialog({ 
-            properties: ['openFile', 'multiSelections'],
-            filters: [
-              { name: "PDF", extensions: ["pdf"] },
-              { name: "All Files", extensions: ["*"] }
-            ]
-          })
-          if(filePaths) filePaths.forEach( (path) => { createPDFWindow(path); })
-        }
-    }, 
-    {
-      label: 'New Text Edtior',
-      accelerator: "CmdOrCtrl+n",
-      click: function() {
-        createHTMLWindow('public/editor.html')          
-      }
-    },
-    {
-      label: 'Close All',
-      click: function() {
-        app.quit()
-      }
-    }
-  ]},{
-    label: 'View',
-    submenu: [
-      {
-        label: 'View All Links',
-        click: function() {
-          createHTMLWindow('public/linked-list.html') 
-        }
-      }
-    ]
-  }, {
-    label: 'Link',
-    submenu: [
-      {
-        label: 'Link selection between PDF\'s',
-        accelerator: "CmdOrCtrl+l",
-        click: function(menuItem, currentWindow) {
-          data = {
-            toast: true
-          }
-          currentWindow.webContents.send('linking-message',data)
-          currentWindow.webContents.send('pdf-link-step1',data)
-          windowPDFList.map(window => {
-            if(window.id!=currentWindow.id)
-              window.webContents.send('linking-message') //start linking next marked texts
-          })
-        }
-      },{
-        label: 'Finish link between PDF\'s',
-        enabled: false,
-        id: 'finishPdfLink',
-        click: function(menuItem, currentWindow) {
-            currentWindow.webContents.send('pdf-link-step4')
-            windowEditorList.filter(w => w.id == currentWindow.id).forEach(w => w.send('pdf-link-step4',true)) //arg given indicate to stop other events
-        }
-      },{
-        label: 'Internal link to editor',
-        accelerator: "CmdOrCtrl+i",
-        click: function(menuItem, currentWindow) {
-          currentWindow.webContents.send('internal-link-step1')
-        }
-      }
-    ]
-  }
-]);
-
-
 
 ////////////////////////////////////////Application Event Handeling////////////////////////////////////////
 
@@ -292,7 +135,7 @@ app.on('second-instance', (event, commandLine, workingDirectory) => {
       }
     }
   }else {
-    createHTMLWindow('public/editor.html')
+    createEditorWindow('public/editor.html')
   }
 })
 
@@ -314,7 +157,7 @@ app.on('ready', () => {
     }
   }
 
-  if(windowPDFList.length == 0) editorWindow = createHTMLWindow('public/editor.html')
+  if(windowPDFList.length == 0) editorWindow = createEditorWindow('public/editor.html')
 
 
     //Check if files moved or modified
@@ -441,7 +284,7 @@ ipcMain.on('openOtherLink', (event, data) => {
     else{
       //to change path.join(data.doc_path,data.doc_name)
       if(data.file_type == "pdf") createPDFWindow(path.join(data.doc_path,data.doc_name),data.pdf_page)
-      else createHTMLWindow("public/editor.html", path.join(data.doc_path,data.doc_name))
+      else createEditorWindow("public/editor.html", path.join(data.doc_path,data.doc_name))
     }
   })
 });
@@ -473,24 +316,6 @@ ipcMain.on('internal-link-step5', (event, data) => {
   })  
 });
 
-ipcMain.on('requireLinkId', (event, arg) => {
-  let windowThatWantsLink = event.sender
-  console.log("start requireLinkId")
-  tmpLinkListMenu = createHTMLWindow('public/linked-list.html')
-  tmpLinkListMenu.webContents.once('dom-ready', () => {
-    tmpLinkListMenu.webContents.send('requireLinkId')
-  });
-  ipcMain.on('returnLinkId', (event, arg) => {
-    console.log("start returnLinkId")
-    windowThatWantsLink.webContents.send('returnLinkId',arg)
-  });
-});
-
-ipcMain.on('deleteLink', (event, link_id) => {
-  console.log("deleted link with id "+link_id)
-  db.deleteLinkById(link_id)
-});
-
 ipcMain.on('saveTextAsHTML-step2',(event, data) => {
   //data = file path and internalLinkIdList
   data.filePath = path.dirname(data.filePathFull)
@@ -502,8 +327,28 @@ ipcMain.on('saveTextAsHTML-step2',(event, data) => {
   //update links in pdf-viewers
 });
 
-/////////////////////////////////////////
+ipcMain.on('send-anchor', (event, data) => {
+  console.log("send-anchor with data: "+JSON.stringify(data))
+  if(data.anchor_2){
+    menu.getMenuItemById('start-link').enabled = true
+    menu.getMenuItemById('finish-link').enabled = false
+    prompt(linkSavingPromptOptions, BrowserWindow.fromId(data.windowId_2)).then((result) => {
+      db.createLinkWithAnchors(result["link_name"],result["link_description"],data.anchor_1,data.anchor_2).then( (link_ids) => {
+        data.link_id = link_ids.link_id
+        data.anchor_id_1 = link_ids.anchor_id_1
+        data.anchor_id_2 = link_ids.anchor_id_2
+        BrowserWindow.fromId(data.windowId_1).webContents.send('put-link', data)
+        if(data.windowId_1 != data.windowId_2) BrowserWindow.fromId(data.windowId_2).webContents.send('put-link', data)
+      })
+    }).catch((err) => {console.log(err)})  
+  } else {
+    menu.getMenuItemById('start-link').enabled = false
+    menu.getMenuItemById('finish-link').enabled = true
+    ipcMain.on('forward-anchor', (event) => {event.sender.webContents.send("get-anchor",data)})
+  }
+})
 
+//////////////////////////////////// const ////////////////////////////////////
 
 const linkSavingPromptOptions = {
   title: 'Save Link',    
@@ -544,3 +389,101 @@ const linkSavingPromptOptions = {
   ]
 
 }
+
+const menu = Menu.buildFromTemplate([
+  {
+    label: 'File',
+    submenu: [
+    {
+        label: 'Open PDF(s)',
+        accelerator: "CmdOrCtrl+o",
+        click: function() {
+          filePaths = dialog.showOpenDialog({ 
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+              { name: "PDF", extensions: ["pdf"] },
+              { name: "All Files", extensions: ["*"] }
+            ]
+          })
+          if(filePaths) filePaths.forEach( (path) => { createPDFWindow(path); })
+        }
+    },
+    {
+      label: 'Import Text',
+      id: 'import-text',
+      click: function(menuItem, currentWindow) {
+        if(!windowEditorList.includes(currentWindow)) return
+
+        filePath = dialog.showOpenDialog({ 
+          properties: ['openFile'] ,
+          filters: [
+            { name: "HTML", extensions: ["html", "htm"] },
+            { name: "All Files", extensions: ["*"] }
+          ]
+        })
+        if(filePath) {
+          Object.entries(documentWindowMap).forEach((filename, win) => {
+            if(win==currentWindow) documentWindowMap[filename]=null
+          })
+          documentWindowMap[path.basename(filePath[0])] = currentWindow
+          currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
+          currentWindow.send('loadText',filePath[0])
+        }
+      }
+    },
+    {
+      label: 'Save As',
+      accelerator: "CmdOrCtrl+Shift+s",
+      id: 'save-text',
+      click: function(menuItem, currentWindow) {
+        if(!windowEditorList.includes(currentWindow)) return
+        let filePath = dialog.showSaveDialog()
+        if(filePath) currentWindow.send('saveTextAsHTML',filePath)
+      }
+    },
+    {
+      label: 'New Text Edtior',
+      accelerator: "CmdOrCtrl+n",
+      click: function() {
+        createEditorWindow('public/editor.html')          
+      }
+    },
+    {
+      label: 'Close All',
+      accelerator: "CmdOrCtrl+q",
+      click: function() {
+        app.quit()
+      }
+    }
+  ]},{
+    label: 'View',
+    submenu: [
+      {
+        label: 'View All Links',
+        click: function() {
+          createHTMLWindow('public/linked-list.html') 
+        }
+      }
+    ]
+  }, {
+    label: 'Link',
+    submenu: [
+      {
+        label: 'Start Link',
+        accelerator: "CmdOrCtrl+l",
+        id: 'start-link',
+        click: function(menuItem, currentWindow) {
+          currentWindow.webContents.send('get-anchor')
+        }
+      },{
+        label: 'Finish Link',
+        accelerator: "CmdOrCtrl+l",
+        enabled: false,
+        id: 'finish-link',
+        click: function(menuItem, currentWindow) {
+          currentWindow.webContents.send('forward-anchor') //cannot sent message directly to main
+        }
+      }
+    ]
+  }
+]);
