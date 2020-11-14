@@ -1,11 +1,19 @@
+/**
+ * Main function of the Hypertext Writing aid application.
+ *
+ * @file   Main file of the electron application.
+ * @author Kevin Taylor
+ */
+
 const { app, BrowserWindow, webContents, ipcMain, dialog, Menu } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
 const Database = require('./database.js');
 const prompt = require('electron-multi-prompt');
 
-// one instance only
+/**
+  * Check to disallow mutliple instances of the app
+  */ 
 const gotTheLock = app.requestSingleInstanceLock()
 if(!gotTheLock) {
   app.quit()
@@ -14,7 +22,7 @@ if(!gotTheLock) {
 const appBasePath = app.getAppPath()
 const appUserPath = app.getPath("userData")
 const dbFileName = 'mydatabase.sqlite'
-var db = new Database(appUserPath,dbFileName)
+const db = new Database(appUserPath,dbFileName)
 global.sharedObj = {db: db}
 
 let windowPDFList = []
@@ -25,6 +33,10 @@ let windowEditorList = []
 
 ////////////////////////////create window functions////////////////////////////
 
+/**
+ * Creates a window given the file path of HTML file
+ * @param  {String} HTMLFilePath Absolute path to a PDF file.
+ */
 function createHTMLWindow(HTMLFilePath) {
   let win = new BrowserWindow({ 
     width: 800, 
@@ -139,7 +151,6 @@ app.on('second-instance', (event, commandLine, workingDirectory) => {
 app.on('ready', () => {
   // Set menu for all windows, since mac doesnt allow individual window menus
   Menu.setApplicationMenu(menu);
-
   // If app is opend on windows by opening a file 
   if (process.platform == 'win32' && process.argv.length >= 2) {
     let openFilePath = process.argv[1];
@@ -231,6 +242,7 @@ app.on('ready', () => {
 app.on('window-all-closed', () => {
     db.deleteTemporaryLinks()
     db.closeDatabase()
+    db=null
     global.sharedObj.database = null
 
     // On macOS it is common for applications and their menu bar
@@ -242,14 +254,10 @@ app.on('window-all-closed', () => {
 
 ////////////////////////////////////////Message Handeling////////////////////////////////////////
 
-ipcMain.on('openOtherLink', (event, data) => {
-  console.log("openOtherLink clicked: "+JSON.stringify(data))
+ipcMain.on('open-other-link', (event, data) => {
   db.getOtherAnchorData(data.link_id, data.anchor_id).then( (data) => {
-    console.log("db returned data " + JSON.stringify(data))
-    console.log("documentWindowMap keys " + JSON.stringify(Object.keys(documentWindowMap)))
     if(documentWindowMap[data.doc_name]) documentWindowMap[data.doc_name].focus()
     else{
-      //to change path.join(data.doc_path,data.doc_name)
       if(data.file_type == "pdf") createPDFWindow(path.join(data.doc_path,data.doc_name),data.pdf_page)
       else createEditorWindow("public/editor.html", path.join(data.doc_path,data.doc_name))
     }
