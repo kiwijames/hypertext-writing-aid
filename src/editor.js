@@ -13,14 +13,13 @@ var db = remote.getGlobal('sharedObj').db
 
 
 ipcRenderer.on('saveTextAsHTML', (event, data) => {
-    let filepath = data// + ".html"
+    var filepath = data// + ".html"
     let content = document.getElementById('textBox').innerHTML
     let anchors = Array.from(document.getElementById('textBox').getElementsByTagName('a'))
     let linkList = []
     console.log("anchors"+JSON.stringify(anchors))
     anchors.forEach(x => {
         onclickfuntion = x.getAttribute('onclick')
-        //callinternalLink("+data.link_id+", "+data.anchor_id_1+");"
         if(onclickfuntion.includes('callinternalLink')) {
             link = {
                 link_id : onclickfuntion.split('(')[1].split(',')[0],
@@ -36,9 +35,11 @@ ipcRenderer.on('saveTextAsHTML', (event, data) => {
             alert("An error ocurred writing the file" + err.message);
             console.log(err);
         }else{
+            var mtime = fs.statSync(filepath).mtime.toString()
             newData = {
                 filePathFull: data,
-                linkList: linkList
+                linkList: linkList,
+                last_modified: mtime
             }
             console.log("saving document with all this data: "+ JSON.stringify(newData))
             ipcRenderer.send('saveTextAsHTML-step2',newData)
@@ -82,11 +83,12 @@ ipcRenderer.on('internal-link-step3', (event, data) => {//sent from main.js. bas
             anchor = {
                 $doc_name : 'tbd',
                 $doc_path : 'tbd',
-                $pdf_quads : '',
-                $pdf_page: '',
+                $pdf_quads : null,
+                $pdf_page: null,
                 $file_type: "text",
                 $anchor_text : ""+text,
                 $doc_position : "tbd",
+                $last_modified : "tbd",
             }
             data.anchor_2 = anchor
             data.windowId_2 = remote.getCurrentWindow().id

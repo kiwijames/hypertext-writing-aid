@@ -61,11 +61,11 @@ module.exports = class Database {
         });
     }
 
-    updateFilePathForAllAnchors(doc_name, doc_path){
+    updateFilePathForAllAnchors(doc_name, doc_path, last_modified=""){
         this.db.run("UPDATE anchor \
-        SET doc_name = ?, doc_path = ? \
+        SET doc_name = ?, doc_path = ?, last_modified = ? \
         WHERE doc_name = ?", 
-        doc_name, doc_path, doc_name, function (err) {
+        doc_name, doc_path, last_modified, doc_name, function (err) {
             if(err) {
                 console.log("error "+err)
             }
@@ -73,11 +73,11 @@ module.exports = class Database {
     }   
 
 
-    updateTemporaryAnchors(link_id, anchor_id, doc_name, doc_path){
+    updateTemporaryAnchors(link_id, anchor_id, doc_name, doc_path, last_modified){
         this.db.run("UPDATE anchor \
-        SET doc_name = ?, doc_path = ? \
+        SET doc_name = ?, doc_path = ?, last_modified = ? \
         WHERE anchor.anchor_id = ?", 
-        doc_name, doc_path, anchor_id, function (err) {
+        doc_name, doc_path, last_modified, anchor_id, function (err) {
             if(err) {
                 console.log("error "+err)
             }
@@ -139,10 +139,10 @@ module.exports = class Database {
     */
     createAnchor(anchor){
         anchor.$pdf_quads = JSON.stringify(anchor.$pdf_quads)
-        console.log("putting anchor into table")
+        console.log("putting anchor into table ")
         return new Promise((resolve,reject) => {
-            this.db.run("INSERT INTO 'anchor' (doc_name,  doc_path,  file_type,  anchor_text,  pdf_quads,  pdf_page,  doc_position) \
-                                     VALUES ($doc_name, $doc_path, $file_type, $anchor_text, $pdf_quads, $pdf_page, $doc_position)", 
+            this.db.run("INSERT INTO 'anchor' (doc_name,  doc_path,  file_type,  anchor_text,  pdf_quads,  pdf_page, doc_position, last_modified) \
+                                     VALUES ($doc_name, $doc_path, $file_type, $anchor_text, $pdf_quads, $pdf_page, $doc_position, $last_modified)", 
             anchor, function (err) {
                 if(err) {
                     console.log(err)
@@ -179,8 +179,8 @@ module.exports = class Database {
         console.log("getting all links")
         return new Promise((resolve,reject) => {
             this.db.all("SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, \
-            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, \
-            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2 \
+            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
+            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
             FROM link l\
             INNER JOIN anchor AS a1 ON a1.anchor_id = l.anchor_id_1 \
             INNER JOIN anchor AS a2 ON a2.anchor_id = l.anchor_id_2", (err,rows) => {
@@ -332,6 +332,7 @@ const createAnchorTable = 'CREATE TABLE anchor (\
     doc_position TEXT,\
     file_type TEXT,\
     anchor_text TEXT,\
+    last_modified TEXT\
     creation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\
     );'
 

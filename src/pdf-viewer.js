@@ -90,8 +90,8 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
             $pdf_page: page,
             $file_type: "pdf",
             $anchor_text : text,
-            $doc_position : null,
-            //windowId : remote.getCurrentWindow().id
+            $doc_position : "",
+            $last_modified : "", // doesnt matter, because pdf
           }
           data = {
             anchor_1 : anchor,
@@ -122,7 +122,8 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
               $pdf_page: page,
               $file_type: "pdf",
               $anchor_text : text,
-              $doc_position : null,
+              $doc_position : "",
+              $last_modified : "", // doesnt matter, because pdf
             }
             anchors.anchor_2 = anchor
             anchors.windowId_2 = remote.getCurrentWindow().id
@@ -155,7 +156,8 @@ function createPDFViewer(pdfFilePathFull, pageNumber=1, quads, link_id, appBaseP
             $pdf_page: page,
             $file_type: "pdf",
             $anchor_text : text,
-            $doc_position : null
+            $doc_position : "", // empty, because pdf
+            $last_modified : "", // empty matter, because pdf
           }
           data = {
             anchor_1: anchor,

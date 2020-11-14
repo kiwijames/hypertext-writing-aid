@@ -274,8 +274,7 @@ const menuPDF = Menu.buildFromTemplate([
   }
 ]);
 
-//Set Menu for all windows, since mac doesnt allow individual window menus
-Menu.setApplicationMenu(menu);
+
 
 ////////////////////////////////////////Application Event Handeling////////////////////////////////////////
 
@@ -298,6 +297,9 @@ app.on('second-instance', (event, commandLine, workingDirectory) => {
 })
 
 app.on('ready', () => {
+  // Set menu for all windows, since mac doesnt allow individual window menus
+  Menu.setApplicationMenu(menu);
+
   // If app is opend on windows by opening a file 
   if (process.platform == 'win32' && process.argv.length >= 2) {
     let openFilePath = process.argv[1];
@@ -315,20 +317,26 @@ app.on('ready', () => {
   if(windowPDFList.length == 0) editorWindow = createHTMLWindow('public/editor.html')
 
 
-    //Check if files moved
+    //Check if files moved or modified
     db.getAllAnchors().then( (rows) => {
-      fullFilePathList = []
+      let fullFilePathList = []
+      let fullLastModifiedList = []
       rows.forEach( (row) => {
         fullFilePath = path.join(row.doc_path,row.doc_name)
+        if(row.last_modified) fullLastModifiedList.push({file_path: fullFilePath, last_modified: row.last_modified})
         if(!fullFilePathList.includes(fullFilePath)) fullFilePathList.push(fullFilePath)
       })
-      missingDocs = []
+
+      let missingDocs = []
+      let modifiedDocs = []
       fullFilePathList.forEach( (filePath) => {
-        if(!fs.existsSync(filePath)){
-          missingDocs.push(filePath)
-        }
+        if(!fs.existsSync(filePath)) missingDocs.push(filePath)
+      })
+      fullLastModifiedList.forEach( obj => {
+        if(!obj.file_path.includes("tbd") && fs.statSync(obj.file_path).mtime.toString() != obj.last_modified) modifiedDocs.push(obj.file_path)
       })
       console.log("missingDocs: "+JSON.stringify(missingDocs))
+      console.log("modifiedDocs: "+JSON.stringify(modifiedDocs))
 
       missingDocs.forEach( (filePath) => {
         let dialogOptions = {
@@ -349,7 +357,7 @@ app.on('ready', () => {
             })
             if(newFilePath) {
               newFilePath = newFilePath[0]
-              db.updateFilePathForAllAnchors(path.basename(newFilePath),path.dirname(newFilePath),path.basename(newFilePath))
+              db.updateFilePathForAllAnchors(path.basename(newFilePath),path.dirname(newFilePath))
             }
             else db.deleteLinksWithFilePath(path.basename(filePath))
           }else {
@@ -357,8 +365,26 @@ app.on('ready', () => {
           }
         });
       })
+
+      modifiedDocs.forEach( (filePath) => {
+        let dialogOptions = {
+          type: 'info',
+          buttons: ['Update all document anchors', 'Remove links'],
+          defaultId: 1,
+          title: 'File has been modified',
+          message: 'A file with links has been modified.',
+          detail: filePath+' has been modified. Please decide to keep or delete the links.',
+        };
+        dialog.showMessageBox(null, dialogOptions, (response) => {
+          if(response == 0) {
+            db.updateFilePathForAllAnchors(path.basename(filePath),path.dirname(filePath),fs.statSync(filePath).mtime.toString())
+          }else {
+            db.deleteLinksWithFilePath(path.basename(filePath))
+          }
+        });
+      })
+
     })
-    
   })
 
 // Quit when all windows are closed.
@@ -437,7 +463,7 @@ ipcMain.on('internal-link-step5', (event, data) => {
         console.log("internal-link-step5" + JSON.stringify(data))
         event.sender.webContents.send('internal-link-step8', data)
         BrowserWindow.fromId(data.windowId_1).webContents.send('internal-link-step7', data)
-      })
+      }).catch(err => console.log(err))
     } else {
         //do sth
     }
@@ -471,7 +497,7 @@ ipcMain.on('saveTextAsHTML-step2',(event, data) => {
   data.fileName = path.basename(data.filePathFull)
   console.log("need to put links with this data "+JSON.stringify(data))
   data.linkList.forEach(link => {
-    db.updateTemporaryAnchors(link.link_id,link.anchor_id,data.fileName,data.filePath)
+    db.updateTemporaryAnchors(link.link_id,link.anchor_id,data.fileName,data.filePath,data.last_modified)
   })
   //update links in pdf-viewers
 });
