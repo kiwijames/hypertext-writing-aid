@@ -29,8 +29,8 @@ ipcRenderer.on("saveTextAsHTML", (event, data) => {
     } else {
       var mtime = fs.statSync(filepath).mtime.toString();
       newData = {
-        filePathFull: data,
-        linkList: linkList,
+        full_file_path: data,
+        link_list: linkList,
         last_modified: mtime,
       };
       console.log(
@@ -98,7 +98,7 @@ ipcRenderer.on("get-anchor", (event, data) => {
     alert("'" + text + "' selected.");
     ipcRenderer.send("send-anchor", data);
 
-    ipcRenderer.on("put-link", (event, data) => {
+    ipcRenderer.once("put-link", (event, data) => {
       if (data.windowId_1 == remote.getCurrentWindow().id) {
         linkingFunction =
           "callinternalLink(" + data.link_id + ", " + data.anchor_id_1 + ");";

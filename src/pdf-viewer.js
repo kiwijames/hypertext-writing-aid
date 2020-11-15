@@ -56,26 +56,8 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
         }
       });
 
-      ipcRenderer.on("focus-text", (event, arg) => {
-        console.log("open page " + arg);
-        docViewer.setCurrentPage(arg);
-      });
-
-      ipcRenderer.on("update-temp-links", (event, arg) => {
-        let link_id = arg;
-        //update all annotations without link_id with this
-        annotList = annotManager.getAnnotationsList();
-        annotList.forEach((x) => {
-          if (x.getCustomData("tmp")) {
-            x.deleteCustomData("tmp");
-            x.setCustomData("linkId", link_id);
-            annotManager.redrawAnnotation(x);
-          }
-        });
-      });
-
-      ipcRenderer.on("forward-anchor", (event) => {
-        event.sender.send("forward-anchor");
+      ipcRenderer.on("forward-anchor", (event, data) => {
+        event.sender.send("forward-anchor", data);
       });
 
       ipcRenderer.on("cancel-anchor", (event, data) => {
@@ -84,6 +66,10 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
 
       ipcRenderer.on("alert", (event, data) => {
         alert(data)
+      });
+
+      ipcRenderer.on("focus-page", (event, data) => {
+        docViewer.setCurrentPage(data);
       });
 
       ipcRenderer.on("get-anchor", (event, data) => {

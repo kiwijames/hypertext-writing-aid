@@ -35,11 +35,10 @@ function putTable(tabledata, all_columns){
         align:"center", 
         cellClick:function(e, cell){
             let row = cell.getRow()
-            ipcRenderer.send('deleteLink',row.getData()["Link ID"]);
+            ipcRenderer.send('delete-link',row.getData()["Link ID"]);
             cell.getRow().delete();
         }
     });
-    
     table.redraw()
 }
 

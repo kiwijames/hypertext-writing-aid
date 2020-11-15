@@ -95,9 +95,7 @@ module.exports = class Database {
       last_modified,
       doc_name,
       function (err) {
-        if (err) {
-          console.log("error " + err);
-        }
+        if (err) console.log(err);
       }
     );
   }
@@ -116,9 +114,7 @@ module.exports = class Database {
        WHERE anchor.anchor_id = ?",
       doc_name,doc_path,last_modified,anchor_id,
       function (err) {
-        if (err) {
-          console.log("error " + err);
-        }
+        if (err) console.log(err);
       }
     );
   }
@@ -131,28 +127,21 @@ module.exports = class Database {
    * @param  {Object} anchor_2 Second anchor oject
    */
   createLinkWithAnchors(link_name, link_description, anchor_1, anchor_2) {
-    console.log("createLinkWithAnchors ANCHOR1 " + JSON.stringify(anchor_1));
-    console.log("createLinkWithAnchors ANCHOR2 " + JSON.stringify(anchor_2));
     return new Promise((resolve, reject) => {
-      console.log("createLinkWithAnchors called");
       this.createAnchor(anchor_1).then((anchor_id_1) => {
-        console.log("first anchor");
         this.createAnchor(anchor_2).then((anchor_id_2) => {
-          console.log("second anchr");
           let link = {
             $link_name: link_name,
             $link_description: link_description,
             $anchor_id_1: anchor_id_1,
             $anchor_id_2: anchor_id_2,
           };
-          console.log("link= " + JSON.stringify(link));
           this.createLink(link).then((link_id) => {
             let link_ids = {
               link_id: link_id,
               anchor_id_1: anchor_id_1,
               anchor_id_2: anchor_id_2,
             };
-            console.log("link finished");
             resolve(link_ids);
           });
         });
@@ -171,10 +160,8 @@ module.exports = class Database {
             VALUES($link_name,$link_description,$anchor_id_1,$anchor_id_2)",
         link,
         function (err) {
-          if (err) {
-            console.log("error " + err);
-            reject(err);
-          } else resolve(this.lastID);
+          if (err) eject(err);
+          else resolve(this.lastID);
         }
       );
     });
@@ -186,17 +173,14 @@ module.exports = class Database {
    */
   createAnchor(anchor) {
     anchor.$pdf_quads = JSON.stringify(anchor.$pdf_quads);
-    console.log("putting anchor into table ");
     return new Promise((resolve, reject) => {
       this.db.run(
         "INSERT INTO 'anchor' (doc_name,  doc_path,  file_type,  anchor_text,  pdf_quads,  pdf_page, doc_position, last_modified) \
                                      VALUES ($doc_name, $doc_path, $file_type, $anchor_text, $pdf_quads, $pdf_page, $doc_position, $last_modified)",
         anchor,
         function (err) {
-          if (err) {
-            console.log(err);
-            reject(err);
-          } else resolve(this.lastID);
+          if (err) reject(err);
+          else resolve(this.lastID);
         }
       );
     });
@@ -209,10 +193,8 @@ module.exports = class Database {
   getAllAnchors() {
     return new Promise((resolve, reject) => {
       this.db.all("SELECT * from anchor", (err, rows) => {
-        if (err) {
-          console.log(err);
-          reject(err);
-        } else resolve(rows);
+        if (err) reject(err);
+        else resolve(rows);
       });
     });
   }
@@ -222,7 +204,6 @@ module.exports = class Database {
    * @return  {[Object]} list of sqlite3 database objects
    */
   getAllLinks() {
-    console.log("getting all links");
     return new Promise((resolve, reject) => {
       this.db.all(
         "SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, \
@@ -232,10 +213,8 @@ module.exports = class Database {
             INNER JOIN anchor AS a1 ON a1.anchor_id = l.anchor_id_1 \
             INNER JOIN anchor AS a2 ON a2.anchor_id = l.anchor_id_2",
         (err, rows) => {
-          if (err) {
-            console.log(err);
-            reject(err);
-          } else resolve(rows);
+          if (err) reject(err);
+          else resolve(rows);
         }
       );
     });
@@ -252,10 +231,8 @@ module.exports = class Database {
         "SELECT * FROM link, anchor WHERE (anchor_id = link.anchor_id_1 OR anchor_id = link.anchor_id_2) AND doc_name = ?",
         doc_name,
         (err, rows) => {
-          if (err) {
-            console.log(err);
-            reject(err);
-          } else resolve(rows);
+          if (err) reject(err);
+          else resolve(rows);
         }
       );
     });
@@ -268,7 +245,6 @@ module.exports = class Database {
    * @return  {Object} sqlite3 database object
    */
   getOtherAnchorData(link_id, anchor_id) {
-    console.log("getOtherAnchorDatacalled");
     return new Promise((resolve, reject) => {
       this.db.get(
         "SELECT * FROM link, anchor WHERE (anchor_id=anchor_id_1 OR anchor_id=anchor_id_2) AND link_id = ? AND anchor_id != ? \
@@ -349,7 +325,6 @@ module.exports = class Database {
     let deleteStatement = "DELETE FROM link WHERE link_id = ?";
     this.db.run(deleteStatement, link_id, function (err) {
       if (err) console.error("Error occured when trying to delete link ", err);
-      else console.debug("Finished deleting link with the link_id " + link_id);
     });
   }
 

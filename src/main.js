@@ -119,7 +119,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
   //Uncomment DevTools for debugging
-  contents.openDevTools()
+  //contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
@@ -258,7 +258,10 @@ app.on('window-all-closed', () => {
 
 ipcMain.on('open-other-link', (event, data) => {
   db.getOtherAnchorData(data.link_id, data.anchor_id).then( (data) => {
-    if(documentWindowMap[data.doc_name]) documentWindowMap[data.doc_name].focus()
+    if(documentWindowMap[data.doc_name]) {
+      documentWindowMap[data.doc_name].webContents.send("focus-page", data.pdf_page)
+      documentWindowMap[data.doc_name].focus()
+    }
     else{
       if(data.file_type == "pdf") createPDFWindow(path.join(data.doc_path,data.doc_name),data.pdf_page)
       else createEditorWindow("public/editor.html", path.join(data.doc_path,data.doc_name))
@@ -267,14 +270,11 @@ ipcMain.on('open-other-link', (event, data) => {
 });
 
 ipcMain.on('saveTextAsHTML-step2',(event, data) => {
-  //data = file path and internalLinkIdList
-  data.filePath = path.dirname(data.filePathFull)
-  data.fileName = path.basename(data.filePathFull)
-  console.log("need to put links with this data "+JSON.stringify(data))
-  data.linkList.forEach(link => {
-    db.updateTemporaryAnchors(link.link_id,link.anchor_id,data.fileName,data.filePath,data.last_modified)
+  data.file_path = path.dirname(data.full_file_path)
+  data.file_name = path.basename(data.full_file_path)
+  data.link_list.forEach(link => {
+    db.updateTemporaryAnchors(link.link_id,link.anchor_id,data.file_name,data.file_path,data.last_modified)
   })
-  //TODO: update links in pdf-viewers
 });
 
 ipcMain.on('send-anchor', (event, data) => {
@@ -283,34 +283,50 @@ ipcMain.on('send-anchor', (event, data) => {
     menu.getMenuItemById('finish-link').enabled = false
     menu.getMenuItemById('cancel-link').enabled = false
     event.sender.webContents.send("alert","Linking was canceled.")
+    data = {}
     return
   }
   if(data.anchor_2){
-    if(data.anchor_2.$file_type == "text" && data.anchor_1.$file_type == "text"){ // cannot set links between text editors
+    if(data.anchor_2.$file_type == "text" && data.anchor_1.$file_type == "text"){ // currently soent support links between text editors
       data.anchor_2 = null
       data.windowId_2 = null
       event.sender.webContents.send("alert","Linking between two documents is currently not supported.")
-      ipcMain.on('forward-anchor', (event) => {event.sender.webContents.send("get-anchor",data)})
+      ipcMain.once('forward-anchor', (event) => {
+        event.sender.webContents.send("get-anchor",data)
+      })
       return
     }
     menu.getMenuItemById('start-link').enabled = true
     menu.getMenuItemById('finish-link').enabled = false
     menu.getMenuItemById('cancel-link').enabled = false
     prompt(linkSavingPromptOptions, BrowserWindow.fromId(data.windowId_2)).then((result) => {
+      if(!result) {
+        data = {}
+        event.sender.webContents.send("alert", "Linking canceled")
+        return
+      }
       db.createLinkWithAnchors(result["link_name"],result["link_description"],data.anchor_1,data.anchor_2).then( (link_ids) => {
         data.link_id = link_ids.link_id
         data.anchor_id_1 = link_ids.anchor_id_1
         data.anchor_id_2 = link_ids.anchor_id_2
         BrowserWindow.fromId(data.windowId_1).webContents.send('put-link', data)
         if(data.windowId_1 != data.windowId_2) BrowserWindow.fromId(data.windowId_2).webContents.send('put-link', data)
+        data = {}
       })
     }).catch((err) => {console.log(err)});
   } else {
     menu.getMenuItemById('start-link').enabled = false
     menu.getMenuItemById('finish-link').enabled = true
     menu.getMenuItemById('cancel-link').enabled = true
-    ipcMain.on('forward-anchor', (event) => {event.sender.webContents.send("get-anchor",data)})
+    ipcMain.once('forward-anchor', (event, new_data) => {
+      if(new_data && new_data.cancel) return
+      event.sender.webContents.send("get-anchor",data)
+    })
   }
+})
+
+ipcMain.on('delete-link', (event, data) => {
+  db.deleteLinkById(data)
 })
 
 //////////////////////////////////// const ////////////////////////////////////
@@ -467,7 +483,8 @@ const menu = Menu.buildFromTemplate([
         id: 'cancel-link',
         click: function(menuItem, currentWindow) {
           let data = {cancel : true}
-          currentWindow.webContents.send('cancel-anchor',data) //cannot sent message directly to main
+          currentWindow.webContents.send('cancel-anchor', data) //cannot sent message directly to main
+          currentWindow.webContents.send('forward-anchor', data)
         }
       }
     ]
