@@ -27,13 +27,7 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
   let webviewerPath = path.resolve(
     path.join(appBasePath, "node_modules/@pdftron/webviewer/public")
   );
-  WebViewer(
-    {
-      path: webviewerPath,
-      initialDoc: pdfFilePathFull,
-    },
-    viewerElement
-  ).then((instance) => {
+  WebViewer({path: webviewerPath, initialDoc: pdfFilePathFull}, viewerElement).then((instance) => {
     console.debug("pdf-viewer.js viewer ready");
     // Interact with APIs here,
     // See https://www.pdftron.com/documentation/web/guides/basic-functionality for more info/
@@ -88,6 +82,10 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
         event.sender.send("send-anchor", data);
       });
 
+      ipcRenderer.on("alert", (event, data) => {
+        alert(data)
+      });
+
       ipcRenderer.on("get-anchor", (event, data) => {
         let page = docViewer.getCurrentPage();
         let quads = docViewer.getSelectedTextQuads();
@@ -129,7 +127,7 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
         }
       });
     });
-  });
+  }).catch((err) => {console.log(err)});
 }
 
 /**
@@ -168,6 +166,6 @@ function loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName) {
       console.log("reihe " + row);
       quads = JSON.parse(row.pdf_quads);
       highlightQuads( Annotations, annotManager, quads, row.link_id, row.anchor_id);
-    });
-  });
+    })
+  }).catch((err) => {console.log(err)});
 }

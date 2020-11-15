@@ -5,7 +5,6 @@ const db = remote.getGlobal('sharedObj').db
 
 db.getAllLinks().then( (rows) => {
     let tabledata = []
-    console.log("rows: "+JSON.stringify(rows))
     rows.forEach((row) => {
         tabledata.push(
             {
@@ -25,7 +24,6 @@ db.getAllLinks().then( (rows) => {
 
 //define table
 function putTable(tabledata, all_columns){
-    console.log("creating table")
     let table = new Tabulator("#table", {
         layout:"fitDataFill",
         data: tabledata,
@@ -37,9 +35,7 @@ function putTable(tabledata, all_columns){
         align:"center", 
         cellClick:function(e, cell){
             let row = cell.getRow()
-            console.log(JSON.stringify(row.getData()["Link ID"]))
             ipcRenderer.send('deleteLink',row.getData()["Link ID"]);
-            console.log("row.getData().link_id "+row.getData("Link ID")["Link ID"])
             cell.getRow().delete();
         }
     });

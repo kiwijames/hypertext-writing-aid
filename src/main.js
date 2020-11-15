@@ -47,8 +47,8 @@ function createHTMLWindow(HTMLFilePath) {
         webSecurity: false
       }
     })
-    win.setMenuBarVisibility(true)
-    win.webContents.openDevTools()
+    win.setMenuBarVisibility(false)
+    //win.webContents.openDevTools()
     win.loadFile(HTMLFilePath)
     win.on('close', () => {
       // Dereference the window object and remove from list
@@ -76,7 +76,7 @@ function createEditorWindow(HTMLFilePath, doc_path='') {
   })
   if(doc_path) win.setTitle("Hypertext Writing Aid - "+path.basename(doc_path))
   win.loadFile(HTMLFilePath)
-  win.webContents.openDevTools()
+  //win.webContents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowEditorList = windowEditorList.filter(w => w.id !== win.id)
@@ -238,7 +238,7 @@ app.on('ready', () => {
         });
       })
 
-    })
+    }).catch((err) => {console.log(err)});
   })
 
 // Quit when all windows are closed.
@@ -263,7 +263,7 @@ ipcMain.on('open-other-link', (event, data) => {
       if(data.file_type == "pdf") createPDFWindow(path.join(data.doc_path,data.doc_name),data.pdf_page)
       else createEditorWindow("public/editor.html", path.join(data.doc_path,data.doc_name))
     }
-  })
+  }).catch((err) => {console.log(err)});
 });
 
 ipcMain.on('saveTextAsHTML-step2',(event, data) => {
@@ -282,12 +282,14 @@ ipcMain.on('send-anchor', (event, data) => {
     menu.getMenuItemById('start-link').enabled = true
     menu.getMenuItemById('finish-link').enabled = false
     menu.getMenuItemById('cancel-link').enabled = false
+    event.sender.webContents.send("alert","Linking was canceled.")
     return
   }
   if(data.anchor_2){
     if(data.anchor_2.$file_type == "text" && data.anchor_1.$file_type == "text"){ // cannot set links between text editors
       data.anchor_2 = null
       data.windowId_2 = null
+      event.sender.webContents.send("alert","Linking between two documents is currently not supported.")
       ipcMain.on('forward-anchor', (event) => {event.sender.webContents.send("get-anchor",data)})
       return
     }
@@ -302,7 +304,7 @@ ipcMain.on('send-anchor', (event, data) => {
         BrowserWindow.fromId(data.windowId_1).webContents.send('put-link', data)
         if(data.windowId_1 != data.windowId_2) BrowserWindow.fromId(data.windowId_2).webContents.send('put-link', data)
       })
-    }).catch((err) => {console.log(err)})  
+    }).catch((err) => {console.log(err)});
   } else {
     menu.getMenuItemById('start-link').enabled = false
     menu.getMenuItemById('finish-link').enabled = true
@@ -436,7 +438,7 @@ const menu = Menu.buildFromTemplate([
           createHTMLWindow('public/all-links-list.html').then( (win) => {
             win.webContents.once('dom-ready', () => {
               win.webContents.send('send-doc-name', doc_name)
-           })
+           }).catch((err) => {console.log(err)});
           })
         }
       }

@@ -62,6 +62,10 @@ ipcRenderer.on("cancel-anchor", (event, data) => {
   event.sender.send("send-anchor", data);
 });
 
+ipcRenderer.on("alert", (event, data) => {
+  alert(data)
+});
+
 ipcRenderer.on("get-anchor", (event, data) => {
   let textBox = document.getElementById("textBox");
   let text = window.getSelection();
