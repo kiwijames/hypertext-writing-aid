@@ -247,11 +247,9 @@ module.exports = class Database {
   getOtherAnchorData(link_id, anchor_id) {
     return new Promise((resolve, reject) => {
       this.db.get(
-        "SELECT * FROM link, anchor WHERE (anchor_id=anchor_id_1 OR anchor_id=anchor_id_2) AND link_id = ? AND anchor_id != ? \
-            ",
-        link_id,
-        anchor_id,
-        (err, row) => {
+        "SELECT * FROM link, anchor \
+        WHERE (anchor_id=anchor_id_1 OR anchor_id=anchor_id_2) AND link_id = ? AND anchor_id != ?",
+        link_id, anchor_id, (err, row) => {
           if (err) reject(err);
           else resolve(row);
         }

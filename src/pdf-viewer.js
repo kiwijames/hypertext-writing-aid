@@ -56,6 +56,18 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
         }
       });
 
+      instance.setAnnotationContentOverlayHandler(annotation => {
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(`Linking to  ${annotation.doc}`));
+        div.appendChild(document.createElement('br'));
+        div.appendChild(document.createElement('br'));
+        div.appendChild(document.createTextNode(`[...] ${annotation.text} [...]`));
+        return div;
+    });
+
+
+      /////////////////////// Electron event handeling ///////////////////////
+
       ipcRenderer.on("forward-anchor", (event, data) => {
         event.sender.send("forward-anchor", data);
       });
@@ -106,10 +118,10 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
       ipcRenderer.on("put-link", (event, data) => {
         console.log("receiving put link: " + JSON.stringify(data));
         if (data.anchor_1.$doc_name == pdfFileName) {
-          highlightQuads(Annotations, annotManager, data.anchor_1.$pdf_quads, data.link_id, data.anchor_id_1);
+          highlightQuads(Annotations, annotManager, data.anchor_1.$pdf_quads, data.link_id, data.anchor_id_1, data.anchor_2.$anchor_doc_name, data.anchor_2.$anchor_text);
         }
         if (data.anchor_2.$doc_name == pdfFileName) {
-          highlightQuads(Annotations, annotManager, data.anchor_2.$pdf_quads, data.link_id, data.anchor_id_2);
+          highlightQuads(Annotations, annotManager, data.anchor_2.$pdf_quads, data.link_id, data.anchor_id_2, data.anchor_1.$anchor_doc_name, data.anchor_1.$anchor_text);
         }
       });
     });
@@ -123,17 +135,22 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
  * @param  {Object} quads quads to be highlighted
  * @param  {Number} link_id Link ID put into the annotation/link
  * @param  {Number} anchor_id Anchor ID put into the annotation/link
+ * @param  {String} other_doc Name of the document that is linked to
+ * @param  {String} other_text Text of the anchor that is linked to
  */
-function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id) {
+function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id, other_doc, other_text) {
   let highlights = [];
   if (typeof quads == "string") quads = JSON.parse(quads);
   let pageNumbers = Object.keys(quads);
   pageNumbers.forEach((num) => {
     let highlight = new Annotations.TextHighlightAnnotation();
+    highlight.StrokeColor = new Annotations.Color(185, 209, 248);
     highlight.PageNumber = num;
     highlight.Quads = quads[num];
     highlight.setCustomData("link_id", link_id);
     highlight.setCustomData("anchor_id", anchor_id);
+    highlight.doc = other_doc;
+    highlight.text = other_text;
     highlights.push(highlight);
   });
   annotManager.addAnnotation(highlights);
@@ -149,9 +166,11 @@ function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id) {
 function loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName) {
   db.getAllAnchorsForDoc(pdfFileName).then((rows) => {
     rows.forEach((row) => {
-      console.log("reihe " + row);
-      quads = JSON.parse(row.pdf_quads);
-      highlightQuads( Annotations, annotManager, quads, row.link_id, row.anchor_id);
+      db.getOtherAnchorData(row.link_id, row.anchor_id).then((other_rows) => {
+        quads = JSON.parse(row.pdf_quads);
+        highlightQuads( Annotations, annotManager, quads, row.link_id, row.anchor_id, other_rows.doc_name, other_rows.anchor_text);
+
+      })
     })
   }).catch((err) => {console.log(err)});
 }

@@ -393,8 +393,10 @@ const menu = Menu.buildFromTemplate([
       label: 'Import Text',
       id: 'import-text',
       click: function(menuItem, currentWindow) {
-        if(!windowEditorList.includes(currentWindow)) return
-
+        if(!windowEditorList.includes(currentWindow)) {
+          currentWindow.webContents.send('alert', "This works only with the text editor focused.")
+          return
+        }
         filePath = dialog.showOpenDialog({ 
           properties: ['openFile'] ,
           filters: [

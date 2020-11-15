@@ -70,7 +70,7 @@ ipcRenderer.on('send-doc-name', (event, data) => {
 const all_columns = [
     {title:"Link ID",           field:"Link ID",          sorter:"number"},
     {title:"Link Name",         field:"Link Name",        sorter:"string"},
-    {title:"Link Description",  field:"Link Description", sorter:"string"},
+    {title:"Link Description",  field:"Link Description", sorter:"string", formatter: "textarea"},
     {title:"Creation Date",     field:"Creation Date",    sorter:"date"},
     {title:"Document Name (1)", field:"Document Name (1)",sorter:"string"},
     {title:"Anchor Text (1)",   field:"Anchor Text (1)",  sorter:"string", formatter: "textarea"},
@@ -81,7 +81,7 @@ const all_columns = [
 const doc_columns = [
     {title:"Link ID",         field:"Link ID",         sorter:"number"},
     {title:"Link Name",       field:"Link Name",       sorter:"string"},
-    {title:"Link Description",field:"Link Description",sorter:"string"},
+    {title:"Link Description",field:"Link Description",sorter:"string", formatter: "textarea"},
     {title:"Creation Date",   field:"Creation Date",   sorter:"date"},
     {title:"Document Name",   field:"Document Name",   sorter:"string"},
     {title:"Anchor Text",     field:"Anchor Text",     sorter:"string", formatter: "textarea"}
