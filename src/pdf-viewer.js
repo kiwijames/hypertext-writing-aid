@@ -58,7 +58,10 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
 
       instance.setAnnotationContentOverlayHandler(annotation => {
         const div = document.createElement('div');
-        div.appendChild(document.createTextNode(`Linking to  ${annotation.doc}`));
+        if(annotation.doc == pdfFileName) div.appendChild(document.createTextNode('Same document'));
+        else div.appendChild(document.createTextNode(`Linking to  ${annotation.doc}`));
+        div.appendChild(document.createElement('br'));
+        if(annotation.page) div.appendChild(document.createTextNode(` on page ${annotation.page}`));
         div.appendChild(document.createElement('br'));
         div.appendChild(document.createElement('br'));
         div.appendChild(document.createTextNode(`[...] ${annotation.text} [...]`));
@@ -118,10 +121,10 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
       ipcRenderer.on("put-link", (event, data) => {
         console.log("receiving put link: " + JSON.stringify(data));
         if (data.anchor_1.$doc_name == pdfFileName) {
-          highlightQuads(Annotations, annotManager, data.anchor_1.$pdf_quads, data.link_id, data.anchor_id_1, data.anchor_2.$anchor_doc_name, data.anchor_2.$anchor_text);
+          highlightQuads(Annotations, annotManager, data.anchor_1.$pdf_quads, data.link_id, data.anchor_id_1, data.anchor_2.$doc_name, data.anchor_2.$anchor_text, data.anchor_1.$pdf_page);
         }
         if (data.anchor_2.$doc_name == pdfFileName) {
-          highlightQuads(Annotations, annotManager, data.anchor_2.$pdf_quads, data.link_id, data.anchor_id_2, data.anchor_1.$anchor_doc_name, data.anchor_1.$anchor_text);
+          highlightQuads(Annotations, annotManager, data.anchor_2.$pdf_quads, data.link_id, data.anchor_id_2, data.anchor_1.$doc_name, data.anchor_1.$anchor_text, data.anchor_1.$pdf_page);
         }
       });
     });
@@ -138,7 +141,7 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
  * @param  {String} other_doc Name of the document that is linked to
  * @param  {String} other_text Text of the anchor that is linked to
  */
-function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id, other_doc, other_text) {
+function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id, other_doc, other_text, other_page) {
   let highlights = [];
   if (typeof quads == "string") quads = JSON.parse(quads);
   let pageNumbers = Object.keys(quads);
@@ -151,6 +154,7 @@ function highlightQuads(Annotations, annotManager, quads, link_id, anchor_id, ot
     highlight.setCustomData("anchor_id", anchor_id);
     highlight.doc = other_doc;
     highlight.text = other_text;
+    highlight.page = other_page;
     highlights.push(highlight);
   });
   annotManager.addAnnotation(highlights);
@@ -168,7 +172,7 @@ function loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName) {
     rows.forEach((row) => {
       db.getOtherAnchorData(row.link_id, row.anchor_id).then((other_rows) => {
         quads = JSON.parse(row.pdf_quads);
-        highlightQuads( Annotations, annotManager, quads, row.link_id, row.anchor_id, other_rows.doc_name, other_rows.anchor_text);
+        highlightQuads( Annotations, annotManager, quads, row.link_id, row.anchor_id, other_rows.doc_name, other_rows.anchor_text, other_rows.pdf_page);
 
       })
     })
