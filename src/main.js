@@ -426,7 +426,7 @@ const menu = Menu.buildFromTemplate([
       {
         label: 'View All Links',
         click: function() {
-          createHTMLWindow('public/all-links-list.html') 
+          createHTMLWindow('public/link-list.html') 
         }
       },{
         label: 'View Document\'s Links',
@@ -435,7 +435,7 @@ const menu = Menu.buildFromTemplate([
           Object.keys(documentWindowMap).forEach( (key) => {
             if(documentWindowMap[key]==currentWindow) doc_name = key
           })
-          createHTMLWindow('public/all-links-list.html').then( (win) => {
+          createHTMLWindow('public/link-list.html').then( (win) => {
             win.webContents.once('dom-ready', () => {
               win.webContents.send('send-doc-name', doc_name)
            }).catch((err) => {console.log(err)});
