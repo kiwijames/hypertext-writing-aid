@@ -58,6 +58,10 @@ ipcRenderer.on("forward-anchor", (event) => {
   event.sender.send("forward-anchor");
 });
 
+ipcRenderer.on("cancel-anchor", (event, data) => {
+  event.sender.send("send-anchor", data);
+});
+
 ipcRenderer.on("get-anchor", (event, data) => {
   let textBox = document.getElementById("textBox");
   let text = window.getSelection();
@@ -71,11 +75,11 @@ ipcRenderer.on("get-anchor", (event, data) => {
     anchor = {
       $doc_name: "tbd",
       $doc_path: "tbd",
-      $pdf_quads: null,
-      $pdf_page: null,
+      $pdf_quads: "",
+      $pdf_page: "",
       $file_type: "text",
-      $anchor_text: "" + text,
-      $doc_position: "tbd",
+      $anchor_text: "" + text, //as string
+      $doc_position: "",
       $last_modified: "tbd",
     };
     if (data && data.anchor_1) {
@@ -91,7 +95,7 @@ ipcRenderer.on("get-anchor", (event, data) => {
     ipcRenderer.send("send-anchor", data);
 
     ipcRenderer.on("put-link", (event, data) => {
-      if (data.anchor_1.$file_type == "text") {
+      if (data.windowId_1 == remote.getCurrentWindow().id) {
         linkingFunction =
           "callinternalLink(" + data.link_id + ", " + data.anchor_id_1 + ");";
         newTextElement.setAttribute("onclick", linkingFunction);
@@ -99,7 +103,7 @@ ipcRenderer.on("get-anchor", (event, data) => {
         range.deleteContents();
         range.insertNode(newTextElement);
       }
-      if ((data.anchor_2.$file_type = "text")) {
+      if (data.windowId_2 == remote.getCurrentWindow().id) {
         linkingFunction =
           "callinternalLink(" + data.link_id + ", " + data.anchor_id_2 + ");";
         newTextElement.setAttribute("onclick", linkingFunction);
@@ -112,7 +116,7 @@ ipcRenderer.on("get-anchor", (event, data) => {
 });
 
 /**
- * Needs to be put into the editor.html file. It is activated as onclick-Event of the links
+ * Needs to be put into the editor.html file! It is activated as onclick-Event of the links
  * @param  {Number} link_id Link ID
  * @param  {Number} anchor_id Anchor ID
  */

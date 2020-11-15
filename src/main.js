@@ -38,21 +38,24 @@ let windowEditorList = []
  * @param  {String} HTMLFilePath Absolute path to a PDF file.
  */
 function createHTMLWindow(HTMLFilePath) {
-  let win = new BrowserWindow({ 
-    width: 800, 
-    height: 600 ,
-    webPreferences: {
-      nodeIntegration:true,
-      webSecurity: false
-    }
+  return new Promise((resolve) => {
+    let win = new BrowserWindow({ 
+      width: 800, 
+      height: 600 ,
+      webPreferences: {
+        nodeIntegration:true,
+        webSecurity: false
+      }
+    })
+    win.setMenuBarVisibility(true)
+    win.webContents.openDevTools()
+    win.loadFile(HTMLFilePath)
+    win.on('close', () => {
+      // Dereference the window object and remove from list
+      win = null
+    })
+    resolve(win)
   })
-  win.setMenuBarVisibility(false)
-  win.loadFile(HTMLFilePath)
-  win.on('close', () => {
-    // Dereference the window object and remove from list
-    win = null
-  })
-  return win
 }
 
 /**
@@ -73,7 +76,7 @@ function createEditorWindow(HTMLFilePath, doc_path='') {
   })
   if(doc_path) win.setTitle("Hypertext Writing Aid - "+path.basename(doc_path))
   win.loadFile(HTMLFilePath)
-  //win.webContents.openDevTools()
+  win.webContents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowEditorList = windowEditorList.filter(w => w.id !== win.id)
@@ -116,7 +119,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
   //Uncomment DevTools for debugging
-  //contents.openDevTools()
+  contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
@@ -242,7 +245,6 @@ app.on('ready', () => {
 app.on('window-all-closed', () => {
     db.deleteTemporaryLinks()
     db.closeDatabase()
-    db=null
     global.sharedObj.database = null
 
     // On macOS it is common for applications and their menu bar
@@ -272,14 +274,26 @@ ipcMain.on('saveTextAsHTML-step2',(event, data) => {
   data.linkList.forEach(link => {
     db.updateTemporaryAnchors(link.link_id,link.anchor_id,data.fileName,data.filePath,data.last_modified)
   })
-  //update links in pdf-viewers
+  //TODO: update links in pdf-viewers
 });
 
 ipcMain.on('send-anchor', (event, data) => {
-  console.log("send-anchor with data: "+JSON.stringify(data))
-  if(data.anchor_2){
+  if(data.cancel) {
     menu.getMenuItemById('start-link').enabled = true
     menu.getMenuItemById('finish-link').enabled = false
+    menu.getMenuItemById('cancel-link').enabled = false
+    return
+  }
+  if(data.anchor_2){
+    if(data.anchor_2.$file_type == "text" && data.anchor_1.$file_type == "text"){ // cannot set links between text editors
+      data.anchor_2 = null
+      data.windowId_2 = null
+      ipcMain.on('forward-anchor', (event) => {event.sender.webContents.send("get-anchor",data)})
+      return
+    }
+    menu.getMenuItemById('start-link').enabled = true
+    menu.getMenuItemById('finish-link').enabled = false
+    menu.getMenuItemById('cancel-link').enabled = false
     prompt(linkSavingPromptOptions, BrowserWindow.fromId(data.windowId_2)).then((result) => {
       db.createLinkWithAnchors(result["link_name"],result["link_description"],data.anchor_1,data.anchor_2).then( (link_ids) => {
         data.link_id = link_ids.link_id
@@ -292,6 +306,7 @@ ipcMain.on('send-anchor', (event, data) => {
   } else {
     menu.getMenuItemById('start-link').enabled = false
     menu.getMenuItemById('finish-link').enabled = true
+    menu.getMenuItemById('cancel-link').enabled = true
     ipcMain.on('forward-anchor', (event) => {event.sender.webContents.send("get-anchor",data)})
   }
 })
@@ -409,7 +424,20 @@ const menu = Menu.buildFromTemplate([
       {
         label: 'View All Links',
         click: function() {
-          createHTMLWindow('public/linked-list.html') 
+          createHTMLWindow('public/all-links-list.html') 
+        }
+      },{
+        label: 'View Document\'s Links',
+        click: function(menuItem, currentWindow) {
+          let doc_name
+          Object.keys(documentWindowMap).forEach( (key) => {
+            if(documentWindowMap[key]==currentWindow) doc_name = key
+          })
+          createHTMLWindow('public/all-links-list.html').then( (win) => {
+            win.webContents.once('dom-ready', () => {
+              win.webContents.send('send-doc-name', doc_name)
+           })
+          })
         }
       }
     ]
@@ -430,6 +458,14 @@ const menu = Menu.buildFromTemplate([
         id: 'finish-link',
         click: function(menuItem, currentWindow) {
           currentWindow.webContents.send('forward-anchor') //cannot sent message directly to main
+        }
+      },{
+        label: 'Cancel Link',
+        enabled: false,
+        id: 'cancel-link',
+        click: function(menuItem, currentWindow) {
+          let data = {cancel : true}
+          currentWindow.webContents.send('cancel-anchor',data) //cannot sent message directly to main
         }
       }
     ]

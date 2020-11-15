@@ -19,13 +19,7 @@ ipcRenderer.once("pdfFile", (event, pdfFile, pageNumber, quads, link_id) => {
  * @param  {Number} link_id Link ID
  * @param  {String} appBasePath base path of the application because PdfTRON Webviewer needs to be loaded
  */
-function createPDFViewer(
-  pdfFilePathFull,
-  pageNumber = 1,
-  quads,
-  link_id,
-  appBasePath
-) {
+function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBasePath) {
   var pdfFileName = path.basename(pdfFilePathFull);
   var pdfFilePath = path.dirname(pdfFilePathFull);
   console.debug("pdf-viewer.js creating viewer");
@@ -90,6 +84,10 @@ function createPDFViewer(
         event.sender.send("forward-anchor");
       });
 
+      ipcRenderer.on("cancel-anchor", (event, data) => {
+        event.sender.send("send-anchor", data);
+      });
+
       ipcRenderer.on("get-anchor", (event, data) => {
         let page = docViewer.getCurrentPage();
         let quads = docViewer.getSelectedTextQuads();
@@ -124,22 +122,10 @@ function createPDFViewer(
       ipcRenderer.on("put-link", (event, data) => {
         console.log("receiving put link: " + JSON.stringify(data));
         if (data.anchor_1.$doc_name == pdfFileName) {
-          highlightQuads(
-            Annotations,
-            annotManager,
-            data.anchor_1.$pdf_quads,
-            data.link_id,
-            data.anchor_id_1
-          );
+          highlightQuads(Annotations, annotManager, data.anchor_1.$pdf_quads, data.link_id, data.anchor_id_1);
         }
         if (data.anchor_2.$doc_name == pdfFileName) {
-          highlightQuads(
-            Annotations,
-            annotManager,
-            data.anchor_2.$pdf_quads,
-            data.link_id,
-            data.anchor_id_2
-          );
+          highlightQuads(Annotations, annotManager, data.anchor_2.$pdf_quads, data.link_id, data.anchor_id_2);
         }
       });
     });
@@ -181,13 +167,7 @@ function loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName) {
     rows.forEach((row) => {
       console.log("reihe " + row);
       quads = JSON.parse(row.pdf_quads);
-      highlightQuads(
-        Annotations,
-        annotManager,
-        quads,
-        row.link_id,
-        row.anchor_id
-      );
+      highlightQuads( Annotations, annotManager, quads, row.link_id, row.anchor_id);
     });
   });
 }
