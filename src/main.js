@@ -19,6 +19,11 @@ if(!gotTheLock) {
   app.quit()
 }
 
+/**
+  * Command for Mac devices, as this is a prototype, not a certified application
+  */ 
+app.commandLine.appendSwitch ('ignore-certificate-errors', 'true');
+
 const appBasePath = app.getAppPath()
 const appUserPath = app.getPath("userData")
 const dbFileName = 'mydatabase.sqlite'
@@ -29,7 +34,6 @@ let windowPDFList = []
 let documentWindowMap = {} //path to win - win mapping
 let idEditorMap = {} //path to win - win mapping
 let windowEditorList = []
-
 
 ////////////////////////////create window functions////////////////////////////
 
@@ -151,6 +155,21 @@ app.on('second-instance', (event, commandLine, workingDirectory) => {
   }
 })
 
+// Mac Os file open handeling according to documentation: 
+// https://github.com/electron/electron/blob/master/docs/api/app.md#event-open-file-macos
+app.on('will-finish-launching', () => {
+  app.once('open-file', (event, path) => {
+    if (path !== "" && path.includes("pdf")) {
+      try{
+        app.once('ready', () => {createPDFWindow(path) })
+      } catch(e){
+        dialog.showErrorBox("Problem opening PDF: ", e)
+      }
+    }
+  });
+});
+
+
 app.on('ready', () => {
   // Set menu for all windows, since mac doesnt allow individual window menus
   Menu.setApplicationMenu(menu);
@@ -163,12 +182,22 @@ app.on('ready', () => {
         console.log(openFilePath);
         createPDFWindow(openFilePath)}
       catch(e){
-        dialog.showErrorBox("opening pdf problem", e + " und datei: "+openFilePath)
+        dialog.showErrorBox("Problem opening PDF: ", e)
       }
     }
   }
 
-  if(windowPDFList.length == 0) createEditorWindow('public/editor.html')
+  app.on('open-file', (event, path) => {
+    if (path !== "" && path.includes("pdf")) {
+      try{
+        createPDFWindow(path)
+      } catch(e){
+        dialog.showErrorBox("Problem opening PDF: ", e)
+      }
+    }
+  });
+
+  if(process.platform == 'win32' && windowPDFList.length == 0) createEditorWindow('public/editor.html')
 
 
     //Check if files moved or modified
@@ -242,16 +271,15 @@ app.on('ready', () => {
   })
 
 // Quit when all windows are closed.
-app.on('window-all-closed', () => {
+app.on('window-all-closed', () => {    
+  // On macOS it is common for applications and their menu bar
+  // to stay active until the user quits explicitly with Cmd + Q
+  if (process.platform !== 'darwin') {
     db.deleteTemporaryLinks()
     db.closeDatabase()
     global.sharedObj.database = null
-
-    // On macOS it is common for applications and their menu bar
-    // to stay active until the user quits explicitly with Cmd + Q
-    if (process.platform !== 'darwin') {
-        app.quit()
-    }
+    app.quit()
+  }
 })
 
 ////////////////////////////////////////Message Handeling////////////////////////////////////////
@@ -329,7 +357,7 @@ ipcMain.on('delete-link', (event, data) => {
   db.deleteLinkById(data)
 })
 
-//////////////////////////////////// const ////////////////////////////////////
+////////////////////////////////////////////// const //////////////////////////////////////////////
 
 const linkSavingPromptOptions = {
   title: 'Save Link',    
@@ -435,6 +463,9 @@ const menu = Menu.buildFromTemplate([
       label: 'Close All',
       accelerator: "CmdOrCtrl+q",
       click: function() {
+        db.deleteTemporaryLinks()
+        db.closeDatabase()
+        global.sharedObj.database = null
         app.quit()
       }
     }
