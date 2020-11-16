@@ -3,7 +3,7 @@
 
 Hypertext-Writing-Aid's (HWA) main focus is the ability to link text of PDFs to each other and a simple included text editor. With this the user can not just highlight or annotate PDF documents, but can make connections between them. 
 
-![](preview.png)
+![](./preview.png)
 
 ## Installation
 
@@ -22,7 +22,7 @@ npm run dist
 
 Kevin Taylor – taylork@mail.uni-paderborn.de
 
-[https://github.com/kiwijames/hypertext-writing-aid](github.com/hypertext-writing-aid/)
+[github.com/hypertext-writing-aid/](https://github.com/kiwijames/hypertext-writing-aid)
 
-This applications uses the PDFTron WebViewer and its API. Please check [https://www.pdftron.com/licensing](PDFTron) for license related things.
-The icon is based on the Google Docs Flaticon from [https://www.flaticon.com/free-icon/google-docs_2991108?term=document&page=1&position=19 ](flaticon.com).
+This applications uses the PDFTron WebViewer and its API. Please check [PDFTron](https://www.pdftron.com/licensing) for license related things.
+The icon is based on the Google Docs Flaticon from [flaticon.com](https://www.flaticon.com/free-icon/google-docs_2991108?term=document&page=1&position=19).
