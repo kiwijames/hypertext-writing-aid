@@ -283,10 +283,13 @@ module.exports = class Database {
   getFullLinkData(link_id) {
     return new Promise((resolve, reject) => {
       this.db.get(
-        "SELECT * FROM link \
-                        INNER JOIN anchor AS anchor_1 ON anchor_1.link_id = link.link_id \
-                        INNER JOIN anchor AS anchor_2 ON anchor_2.link_id = link.link_id \
-                        WHERE link.link_id= ?",
+        "SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, \
+            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
+            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
+            FROM link l\
+            INNER JOIN anchor AS a1 ON a1.anchor_id = l.anchor_id_1 \
+            INNER JOIN anchor AS a2 ON a2.anchor_id = l.anchor_id_2 \
+            WHERE l.link_id= ?",
         link_id,
         (err, row) => {
           if (err) reject(err);

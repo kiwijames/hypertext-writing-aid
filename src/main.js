@@ -87,11 +87,8 @@ function createEditorWindow(HTMLFilePath, doc_path='') {
     win = null
   })
   win.webContents.on('did-finish-load', () => {
-    console.log("did-finish-load "+doc_path)
     if(doc_path!=''){
-      console.log("did-finish-load "+doc_path)
       win.send('loadText', doc_path)
-      //if(doc_path) documentWindowMap[path.basename(doc_path)] = null
     }
   })
   windowEditorList.push(win)
@@ -179,7 +176,6 @@ app.on('ready', () => {
     let fileExtension = path.extname(openFilePath)
     if (openFilePath !== "" && openFilePath.includes("pdf")) {
       try{
-        console.log(openFilePath);
         createPDFWindow(openFilePath)}
       catch(e){
         dialog.showErrorBox("Problem opening PDF: ", e)
@@ -298,10 +294,10 @@ ipcMain.on('open-other-link', (event, data) => {
 });
 
 ipcMain.on('saveTextAsHTML-step2',(event, data) => {
-  data.file_path = path.dirname(data.full_file_path)
   data.file_name = path.basename(data.full_file_path)
+  data.file_path = path.dirname(data.full_file_path)
   data.link_list.forEach(link => {
-    db.updateTemporaryAnchors(link.link_id,link.anchor_id,data.file_name,data.file_path,data.last_modified)
+    db.updateTemporaryAnchors(link.anchor_id,data.file_name,data.file_path,data.last_modified)
   })
 });
 
@@ -354,7 +350,17 @@ ipcMain.on('send-anchor', (event, data) => {
 })
 
 ipcMain.on('delete-link', (event, data) => {
-  db.deleteLinkById(data)
+  let link_id = data
+  db.getFullLinkData(link_id).then( (data) => {
+    db.deleteLinkById(link_id) //maybe promise necessary
+
+    if(documentWindowMap[data.doc_name_1]){
+      documentWindowMap[data.doc_name_1].webContents.send("remove-link", link_id)
+    }
+    if(documentWindowMap[data.doc_name_2]){
+      documentWindowMap[data.doc_name_2].webContents.send("remove-link", link_id)
+    }
+  })
 })
 
 ////////////////////////////////////////////// const //////////////////////////////////////////////
@@ -419,7 +425,6 @@ const menu = Menu.buildFromTemplate([
     },
     {
       label: 'Import Text',
-      id: 'import-text',
       click: function(menuItem, currentWindow) {
         if(!windowEditorList.includes(currentWindow)) {
           currentWindow.webContents.send('alert', "This works only with the text editor focused.")
@@ -448,8 +453,12 @@ const menu = Menu.buildFromTemplate([
       id: 'save-text',
       click: function(menuItem, currentWindow) {
         if(!windowEditorList.includes(currentWindow)) return
-        let filePath = dialog.showSaveDialog()
-        if(filePath) currentWindow.send('saveTextAsHTML',filePath)
+        let filePath = dialog.showSaveDialog() //on Windows returns a List of strings
+        if(filePath[0]!="/") filePath = filePath[0]
+        if(filePath) {
+          currentWindow.send('saveTextAsHTML',filePath)
+          documentWindowMap[path.basename(filePath)] = currentWindow
+        }
       }
     },
     {

@@ -87,6 +87,17 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
         docViewer.setCurrentPage(data);
       });
 
+      ipcRenderer.on("remove-link", (event, data) => {
+        link_id = data
+        let annots = annotManager.getAnnotationsList();
+        let annotsToDelete = []
+        annots.forEach( annot => {
+            if(annot.getCustomData("link_id")==link_id) annotsToDelete.push(annot)
+        })
+        annotManager.deleteAnnotations(annotsToDelete);
+        //loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName)
+      });
+
       ipcRenderer.on("get-anchor", (event, data) => {
         let page = docViewer.getCurrentPage();
         let quads = docViewer.getSelectedTextQuads();
