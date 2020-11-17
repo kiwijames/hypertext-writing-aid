@@ -338,10 +338,10 @@ ipcMain.on('send-anchor', (event, data) => {
     return
   }
   if(data.anchor_2){
-    if(data.anchor_2.$file_type == "text" && data.anchor_1.$file_type == "text"){ // currently soent support links between text editors
+    if( (data.anchor_2.$file_type == "text" && data.anchor_1.$file_type == "text") && data.windowId_1 == data.windowId_2){ // currently soent support links between text editors
       data.anchor_2 = null
       data.windowId_2 = null
-      event.sender.webContents.send("alert","Linking between two documents is currently not supported.")
+      event.sender.webContents.send("alert","Linking in the same notes is currently not supported.")
       ipcMain.once('forward-anchor', (event) => {
         event.sender.webContents.send("get-anchor",data)
       })
