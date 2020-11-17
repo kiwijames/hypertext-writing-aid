@@ -46,6 +46,8 @@ function createHTMLWindow(HTMLFilePath) {
     let win = new BrowserWindow({ 
       width: 800, 
       height: 600 ,
+      backgroundColor: '#eee', 
+      show: false, 
       webPreferences: {
         nodeIntegration:true,
         webSecurity: false
@@ -54,6 +56,10 @@ function createHTMLWindow(HTMLFilePath) {
     win.setMenuBarVisibility(false)
     //win.webContents.openDevTools()
     win.loadFile(HTMLFilePath)
+    win.on('ready-to-show', function() { 
+      win.show(); 
+      win.focus(); 
+    });
     win.on('close', () => {
       // Dereference the window object and remove from list
       win = null
@@ -73,6 +79,8 @@ function createEditorWindow(HTMLFilePath, doc_path='') {
   let win = new BrowserWindow({ 
     width: 800, 
     height: 600 ,
+    backgroundColor: '#eee', 
+    show: false, 
     webPreferences: {
       nodeIntegration:true,
       webSecurity: false
@@ -80,12 +88,16 @@ function createEditorWindow(HTMLFilePath, doc_path='') {
   })
   if(doc_path) win.setTitle("Hypertext Writing Aid - "+path.basename(doc_path))
   win.loadFile(HTMLFilePath)
-  //win.webContents.openDevTools()
+  win.webContents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowEditorList = windowEditorList.filter(w => w.id !== win.id)
     win = null
   })
+  win.on('ready-to-show', function() { 
+    win.show(); 
+    win.focus(); 
+  });
   win.webContents.on('did-finish-load', () => {
     if(doc_path!=''){
       win.send('loadText', doc_path)
@@ -108,6 +120,8 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
   let win = new BrowserWindow({ 
     width: 800, 
     height: 600 ,
+    backgroundColor: '#eee', 
+    show: false, 
     webPreferences: {
       nodeIntegration:true,
       webSecurity: false
@@ -115,7 +129,12 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
   win.setTitle("Hypertext Writing Aid - "+path.basename(pdfFilePath))
   //win.setMenuBarVisibility(false)
   win.loadFile('public/template.html')
+  //win.webContents.openDevTools()
   let contents = win.webContents
+  win.on('ready-to-show', function() { 
+    win.show(); 
+    win.focus(); 
+  });
   contents.on('dom-ready', () => {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
@@ -168,8 +187,15 @@ app.on('will-finish-launching', () => {
 
 
 app.on('ready', () => {
-  // Set menu for all windows, since mac doesnt allow individual window menus
-  Menu.setApplicationMenu(menu);
+
+  if(process.platform == "darwin") {
+    const menu = menuMac
+    Menu.setApplicationMenu(menu);
+  } else {
+    const menu = menuNonMac
+    Menu.setApplicationMenu(menu);
+  }
+  
   // If app is opend on windows by opening a file 
   if (process.platform == 'win32' && process.argv.length >= 2) {
     let openFilePath = process.argv[1];
@@ -405,7 +431,7 @@ const linkSavingPromptOptions = {
 
 }
 
-const menu = Menu.buildFromTemplate([
+const menuMac = Menu.buildFromTemplate([
   {
     label: 'File',
     submenu: [
@@ -455,6 +481,7 @@ const menu = Menu.buildFromTemplate([
         if(!windowEditorList.includes(currentWindow)) return
         let filePath = dialog.showSaveDialog() //on Windows returns a List of strings
         if(filePath[0]!="/") filePath = filePath[0]
+        filePath = path.join(path.dirname(filePath),path.basename(filePath).split(".")[0])
         if(filePath) {
           currentWindow.send('saveTextAsHTML',filePath)
           documentWindowMap[path.basename(filePath)] = currentWindow
@@ -478,7 +505,36 @@ const menu = Menu.buildFromTemplate([
         app.quit()
       }
     }
-  ]},{
+  ]},{ 
+    label: 'Edit', 
+    submenu: [{ 
+      label: 'Undo', 
+      accelerator: 'CmdOrCtrl+Z', 
+      selector: 'undo:' 
+    }, { 
+      label: 'Redo', 
+      accelerator: 'Shift+CmdOrCtrl+Z', 
+      selector: 'redo:' 
+    }, { 
+      type: 'separator'
+    }, { 
+      label: 'Cut', 
+      accelerator: 'CmdOrCtrl+X', 
+      selector: 'cut:' 
+    }, { 
+      label: 'Copy', 
+      accelerator: 'CmdOrCtrl+C', 
+      selector: 'copy:'
+    }, { 
+      label: 'Paste', 
+      accelerator: 'CmdOrCtrl+V', 
+      selector: 'paste:' 
+    }, { 
+      label: 'Select All', 
+      accelerator: 'CmdOrCtrl+A', 
+      selector: 'selectAll:' 
+    }]
+  }, {
     label: 'View',
     submenu: [
       {
@@ -532,3 +588,133 @@ const menu = Menu.buildFromTemplate([
     ]
   }
 ]);
+
+const menuNonMac = Menu.buildFromTemplate([
+  {
+    label: 'File',
+    submenu: [
+    {
+        label: 'Open PDF(s)',
+        accelerator: "CmdOrCtrl+o",
+        click: function() {
+          filePaths = dialog.showOpenDialog({ 
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+              { name: "PDF", extensions: ["pdf"] },
+              { name: "All Files", extensions: ["*"] }
+            ]
+          })
+          if(filePaths) filePaths.forEach( (path) => { createPDFWindow(path); })
+        }
+    },
+    {
+      label: 'Import Text',
+      click: function(menuItem, currentWindow) {
+        if(!windowEditorList.includes(currentWindow)) {
+          currentWindow.webContents.send('alert', "This works only with the text editor focused.")
+          return
+        }
+        filePath = dialog.showOpenDialog({ 
+          properties: ['openFile'] ,
+          filters: [
+            { name: "HTML", extensions: ["html", "htm"] },
+            { name: "All Files", extensions: ["*"] }
+          ]
+        })
+        if(filePath) {
+          Object.entries(documentWindowMap).forEach((filename, win) => {
+            if(win==currentWindow) documentWindowMap[filename]=null
+          })
+          documentWindowMap[path.basename(filePath[0])] = currentWindow
+          currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
+          currentWindow.send('loadText',filePath[0])
+        }
+      }
+    },
+    {
+      label: 'Save As',
+      accelerator: "CmdOrCtrl+Shift+s",
+      id: 'save-text',
+      click: function(menuItem, currentWindow) {
+        if(!windowEditorList.includes(currentWindow)) return
+        let filePath = dialog.showSaveDialog() //on Windows returns a List of strings
+        if(filePath[0]!="/") filePath = filePath[0]
+        filePath = path.join(path.dirname(filePath),path.basename(filePath).split(".")[0])
+        if(filePath) {
+          currentWindow.send('saveTextAsHTML',filePath)
+          documentWindowMap[path.basename(filePath)] = currentWindow
+        }
+      }
+    },
+    {
+      label: 'New Text Edtior',
+      accelerator: "CmdOrCtrl+n",
+      click: function() {
+        createEditorWindow('public/editor.html')          
+      }
+    },
+    {
+      label: 'Close All',
+      accelerator: "CmdOrCtrl+q",
+      click: function() {
+        db.deleteTemporaryLinks()
+        db.closeDatabase()
+        global.sharedObj.database = null
+        app.quit()
+      }
+    }
+  ]}, {
+    label: 'View',
+    submenu: [
+      {
+        label: 'View All Links',
+        click: function() {
+          createHTMLWindow('public/link-list.html') 
+        }
+      },{
+        label: 'View Document\'s Links',
+        click: function(menuItem, currentWindow) {
+          let doc_name
+          Object.keys(documentWindowMap).forEach( (key) => {
+            if(documentWindowMap[key]==currentWindow) doc_name = key
+          })
+          createHTMLWindow('public/link-list.html').then( (win) => {
+            win.webContents.once('dom-ready', () => {
+              win.webContents.send('send-doc-name', doc_name)
+           }).catch((err) => {console.log(err)});
+          })
+        }
+      }
+    ]
+  }, {
+    label: 'Link',
+    submenu: [
+      {
+        label: 'Start Link',
+        accelerator: "CmdOrCtrl+l",
+        id: 'start-link',
+        click: function(menuItem, currentWindow) {
+          currentWindow.webContents.send('get-anchor')
+        }
+      },{
+        label: 'Finish Link',
+        accelerator: "CmdOrCtrl+l",
+        enabled: false,
+        id: 'finish-link',
+        click: function(menuItem, currentWindow) {
+          currentWindow.webContents.send('forward-anchor') //cannot sent message directly to main
+        }
+      },{
+        label: 'Cancel Link',
+        enabled: false,
+        id: 'cancel-link',
+        click: function(menuItem, currentWindow) {
+          let data = {cancel : true}
+          currentWindow.webContents.send('cancel-anchor', data) //cannot sent message directly to main
+          currentWindow.webContents.send('forward-anchor', data)
+        }
+      }
+    ]
+  }
+]);
+

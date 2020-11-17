@@ -5,7 +5,7 @@ const db = remote.getGlobal("sharedObj").db;
 
 
 ipcRenderer.on("saveTextAsHTML", (event, data) => {
-  let filepath = data
+  let filepath = data + ".html"
   let content = document.getElementById("textBox").innerHTML;
   let anchors = Array.from(document.getElementById("textBox").getElementsByTagName("a"));
   let linkList = [];
@@ -54,7 +54,7 @@ ipcRenderer.on("loadText", (event, data) => {
     db.getAllAnchorsForDoc(path.basename(file_path)).then( (anchors) => {
       let anchorIds = anchors.map(anchor => anchor.anchor_id)
       document.getElementById("textBox").innerHTML = data;
-      let anchors = Array.from(document.getElementById("textBox").getElementsByTagName("a"))
+      anchors = Array.from(document.getElementById("textBox").getElementsByTagName("a"))
       anchors.forEach( (a) => {
         onclickfuntion = a.getAttribute("onclick");
         if (onclickfuntion.includes("callinternalLink") && 
@@ -155,3 +155,4 @@ function callinternalLink(link_id, anchor_id) {
   };
   ipcRenderer.send("open-other-link", data);
 }
+
