@@ -481,6 +481,13 @@ const menuMac = Menu.buildFromTemplate([
       }
     },
     {
+      label: 'New Note Edtior',
+      accelerator: "CmdOrCtrl+n",
+      click: function() {
+        createEditorWindow('public/editor.html')          
+      }
+    },
+    {
       label: 'Save As',
       accelerator: "CmdOrCtrl+Shift+s",
       id: 'save-text',
@@ -493,13 +500,6 @@ const menuMac = Menu.buildFromTemplate([
           currentWindow.send('saveTextAsHTML',filePath)
           documentWindowMap[path.basename(filePath)] = currentWindow
         }
-      }
-    },
-    {
-      label: 'New Text Edtior',
-      accelerator: "CmdOrCtrl+n",
-      click: function() {
-        createEditorWindow('public/editor.html')          
       }
     },
     {
@@ -552,6 +552,7 @@ const menuMac = Menu.buildFromTemplate([
       },{
         label: 'View Document\'s Links',
         click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
           let doc_name
           Object.keys(documentWindowMap).forEach( (key) => {
             if(documentWindowMap[key]==currentWindow) doc_name = key
@@ -572,6 +573,7 @@ const menuMac = Menu.buildFromTemplate([
         accelerator: "CmdOrCtrl+l",
         id: 'start-link',
         click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
           currentWindow.webContents.send('get-anchor')
         }
       },{
@@ -580,6 +582,7 @@ const menuMac = Menu.buildFromTemplate([
         enabled: false,
         id: 'finish-link',
         click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
           currentWindow.webContents.send('forward-anchor') //cannot sent message directly to main
         }
       },{
@@ -645,10 +648,18 @@ const menuNonMac = Menu.buildFromTemplate([
       }
     },
     {
+      label: 'New Note Edtior',
+      accelerator: "CmdOrCtrl+n",
+      click: function() {
+        createEditorWindow('public/editor.html')          
+      }
+    },
+    {
       label: 'Save As',
       accelerator: "CmdOrCtrl+Shift+s",
       id: 'save-text',
       click: function(menuItem, currentWindow) {
+        if(!currentWindow) return
         if(!windowEditorList.includes(currentWindow)) return
         let filePath = dialog.showSaveDialog() //on Windows returns a List of strings
         if(filePath[0]!="/") filePath = filePath[0]
@@ -657,13 +668,6 @@ const menuNonMac = Menu.buildFromTemplate([
           currentWindow.send('saveTextAsHTML',filePath)
           documentWindowMap[path.basename(filePath)] = currentWindow
         }
-      }
-    },
-    {
-      label: 'New Text Edtior',
-      accelerator: "CmdOrCtrl+n",
-      click: function() {
-        createEditorWindow('public/editor.html')          
       }
     },
     {
@@ -687,6 +691,7 @@ const menuNonMac = Menu.buildFromTemplate([
       },{
         label: 'View Document\'s Links',
         click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
           let doc_name
           Object.keys(documentWindowMap).forEach( (key) => {
             if(documentWindowMap[key]==currentWindow) doc_name = key
@@ -707,6 +712,7 @@ const menuNonMac = Menu.buildFromTemplate([
         accelerator: "CmdOrCtrl+l",
         id: 'start-link',
         click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
           currentWindow.webContents.send('get-anchor')
         }
       },{
@@ -715,6 +721,7 @@ const menuNonMac = Menu.buildFromTemplate([
         enabled: false,
         id: 'finish-link',
         click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
           currentWindow.webContents.send('forward-anchor') //cannot sent message directly to main
         }
       },{
