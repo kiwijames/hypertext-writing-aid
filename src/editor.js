@@ -124,16 +124,14 @@ ipcRenderer.on("get-anchor", (event, data) => {
 
     ipcRenderer.once("put-link", (event, data) => {
       if (data.windowId_1 == remote.getCurrentWindow().id) {
-        linkingFunction =
-          "callinternalLink(" + data.link_id + ", " + data.anchor_id_1 + ");";
+        linkingFunction = "callinternalLink(" + data.link_id + ", " + data.anchor_id_1 + ");";
         newTextElement.setAttribute("onclick", linkingFunction);
         let range = text.getRangeAt(0);
         range.deleteContents();
         range.insertNode(newTextElement);
       }
       if (data.windowId_2 == remote.getCurrentWindow().id) {
-        linkingFunction =
-          "callinternalLink(" + data.link_id + ", " + data.anchor_id_2 + ");";
+        linkingFunction = "callinternalLink(" + data.link_id + ", " + data.anchor_id_2 + ");";
         newTextElement.setAttribute("onclick", linkingFunction);
         let range = text.getRangeAt(0);
         range.deleteContents();

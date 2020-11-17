@@ -87,8 +87,9 @@ function createEditorWindow(HTMLFilePath, doc_path='') {
     }  
   })
   if(doc_path) win.setTitle("Hypertext Writing Aid - "+path.basename(doc_path))
+  else win.setTitle("Hypertext Writing Aid - Note Editor")
   win.loadFile(HTMLFilePath)
-  win.webContents.openDevTools()
+  //win.webContents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowEditorList = windowEditorList.filter(w => w.id !== win.id)
@@ -450,12 +451,13 @@ const menuMac = Menu.buildFromTemplate([
         }
     },
     {
-      label: 'Import Text',
+      label: 'Open Note',
       click: function(menuItem, currentWindow) {
-        if(!windowEditorList.includes(currentWindow)) {
-          currentWindow.webContents.send('alert', "This works only with the text editor focused.")
-          return
-        }
+        //if(!currentWindow) return
+        //if(!windowEditorList.includes(currentWindow)) {
+        //  currentWindow.webContents.send('alert', "This works only with the text editor focused.")
+        //  return
+        //}
         filePath = dialog.showOpenDialog({ 
           properties: ['openFile'] ,
           filters: [
@@ -464,12 +466,17 @@ const menuMac = Menu.buildFromTemplate([
           ]
         })
         if(filePath) {
-          Object.entries(documentWindowMap).forEach((filename, win) => {
-            if(win==currentWindow) documentWindowMap[filename]=null
-          })
-          documentWindowMap[path.basename(filePath[0])] = currentWindow
-          currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
-          currentWindow.send('loadText',filePath[0])
+          win = createEditorWindow('public/editor.html')
+          if(filePath[0]!="/") filePath = filePath[0]
+          win.send('loadText',filePath)  
+          win.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
+
+          //Object.entries(documentWindowMap).forEach((filename, win) => {
+          //  if(win==currentWindow) documentWindowMap[filename]=null
+          //})
+          //documentWindowMap[path.basename(filePath[0])] = currentWindow
+          //currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
+          //currentWindow.send('loadText',filePath[0])
         }
       }
     },
@@ -608,12 +615,13 @@ const menuNonMac = Menu.buildFromTemplate([
         }
     },
     {
-      label: 'Import Text',
+      label: 'Open Text',
       click: function(menuItem, currentWindow) {
-        if(!windowEditorList.includes(currentWindow)) {
-          currentWindow.webContents.send('alert', "This works only with the text editor focused.")
-          return
-        }
+        //if(!currentWindow) return
+        //if(!windowEditorList.includes(currentWindow)) {
+        //  currentWindow.webContents.send('alert', "This works only with the text editor focused.")
+        //  return
+        //}
         filePath = dialog.showOpenDialog({ 
           properties: ['openFile'] ,
           filters: [
@@ -622,12 +630,17 @@ const menuNonMac = Menu.buildFromTemplate([
           ]
         })
         if(filePath) {
-          Object.entries(documentWindowMap).forEach((filename, win) => {
-            if(win==currentWindow) documentWindowMap[filename]=null
-          })
-          documentWindowMap[path.basename(filePath[0])] = currentWindow
-          currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
-          currentWindow.send('loadText',filePath[0])
+          win = createEditorWindow('public/editor.html')
+          if(filePath[0]!="/") filePath = filePath[0]
+          win.send('loadText',filePath)  
+          win.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
+
+          //Object.entries(documentWindowMap).forEach((filename, win) => {
+          //  if(win==currentWindow) documentWindowMap[filename]=null
+          //})
+          //documentWindowMap[path.basename(filePath[0])] = currentWindow
+          //currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
+          //currentWindow.send('loadText',filePath[0])
         }
       }
     },
