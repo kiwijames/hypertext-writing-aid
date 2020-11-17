@@ -1,3 +1,10 @@
+/**
+ * Table of links from the user for the Hypertext Writing aid application.
+ *
+ * @file   Linking Table 
+ * @author Kevin Taylor
+ */
+
 const { ipcRenderer, remote } = require('electron');
 const Tabulator = require('tabulator-tables');
 const Database = require('./database.js')

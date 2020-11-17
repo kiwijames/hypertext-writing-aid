@@ -1,3 +1,10 @@
+/**
+ * Note edtior of the Hypertext Writing aid application.
+ *
+ * @file   Logic for a simple note editor.
+ * @author Kevin Taylor
+ */
+
 const { ipcRenderer, remote } = require("electron");
 const fs = require("fs");
 const path = require('path');

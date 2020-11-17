@@ -1,3 +1,10 @@
+/**
+ * Database class including the data-structure of the Hypertext Writing aid application.
+ *
+ * @file   Database class
+ * @author Kevin Taylor
+ */
+
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 const fs = require("fs");

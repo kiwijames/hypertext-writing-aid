@@ -1,3 +1,10 @@
+/**
+ * PDF Viewer with linking supported by PDFTron Webviewer for the Hypertext Writing aid application.
+ *
+ * @file   PDF Edtior
+ * @author Kevin Taylor
+ */
+
 const { ipcRenderer, remote, app } = require("electron");
 const path = require("path");
 const appBasePath = remote.app.getAppPath();
