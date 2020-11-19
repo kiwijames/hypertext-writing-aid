@@ -213,7 +213,7 @@ module.exports = class Database {
   getAllLinks() {
     return new Promise((resolve, reject) => {
       this.db.all(
-        "SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, \
+        "SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, l.anchor_id_1, l.anchor_id_2, \
             a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
             a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
             FROM link l\
@@ -226,6 +226,31 @@ module.exports = class Database {
       );
     });
   }
+
+  /**
+   * Returns a promise returning all links with anchor data filtering for the doc_name
+   * @param  {String} doc_name name of the document
+   * @return  {[Object]} list of sqlite3 database objects
+   */
+  getAllLinksOfDoc(doc_name) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        "SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, l.anchor_id_1, l.anchor_id_2, \
+            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
+            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
+            FROM link l\
+            INNER JOIN anchor AS a1 ON a1.anchor_id = l.anchor_id_1 \
+            INNER JOIN anchor AS a2 ON a2.anchor_id = l.anchor_id_2 \
+            WHERE a1.doc_name = ? OR a2.doc_name = ?", doc_name, doc_name,
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+  }
+
+
 
   /**
    * Returns a promise returning all anchor objects associated with a document name.

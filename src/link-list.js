@@ -19,15 +19,17 @@ db.getAllLinks().then( (rows) => {
                 "Link Name": row.link_name,
                 "Link Description": row.link_description,
                 "Creation Date": row.creation_date,
+                "Anchor ID (1)": row.anchor_id_1,
                 "Document Name (1)": row.doc_name_1,
                 "Anchor Text (1)": row.anchor_text_1,
+                "Anchor ID (2)": row.anchor_id_2,
                 "Document Name (2)": row.doc_name_2,
                 "Anchor Text (2)": row.anchor_text_2,
             }
         )
     })
     putTable(tabledata, all_columns);
-})
+}).catch((err) => {console.log(err)});
 
 //define table
 function putTable(tabledata, all_columns){
@@ -52,7 +54,7 @@ function putTable(tabledata, all_columns){
 ipcRenderer.on('send-doc-name', (event, data) => {
     doc_name = data
     let tabledata = []
-    db.getAllAnchorsForDoc(doc_name).then( (rows) => {
+    db.getAllLinksOfDoc(doc_name).then( (rows) => {
         rows.forEach((row) => {
             tabledata.push(
                 {
@@ -60,14 +62,17 @@ ipcRenderer.on('send-doc-name', (event, data) => {
                     "Link Name": row.link_name,
                     "Link Description": row.link_description,
                     "Creation Date": row.creation_date,
-                    "Document Name": row.doc_name,
-                    "Anchor Text": row.anchor_text,
+                    "Anchor ID (1)": row.anchor_id_1,
+                    "Document Name (1)": row.doc_name_1,
+                    "Anchor Text (1)": row.anchor_text_1,
+                    "Anchor ID (2)": row.anchor_id_2,
+                    "Document Name (2)": row.doc_name_2,
+                    "Anchor Text (2)": row.anchor_text_2,
                 }
             )
         })
-        putTable(tabledata,doc_columns)
-    })
-
+        putTable(tabledata,all_columns)
+    }).catch((err) => {console.log(err)});
 
 });
 
@@ -76,20 +81,26 @@ ipcRenderer.on('send-doc-name', (event, data) => {
 //////////////////////////////////// const ////////////////////////////////////
 const all_columns = [
     {title:"Link ID",           field:"Link ID",          sorter:"number"},
-    {title:"Link Name",         field:"Link Name",        sorter:"string"},
-    {title:"Link Description",  field:"Link Description", sorter:"string", formatter: "textarea"},
+    {title:"Link Name",         field:"Link Name",        sorter:"string", headerFilter:"input"},
+    {title:"Link Description",  field:"Link Description", sorter:"string", formatter: "textarea", headerFilter:"input"},
     {title:"Creation Date",     field:"Creation Date",    sorter:"date"},
-    {title:"Document Name (1)", field:"Document Name (1)",sorter:"string"},
-    {title:"Anchor Text (1)",   field:"Anchor Text (1)",  sorter:"string", formatter: "textarea"},
-    {title:"Document Name (2)", field:"Document Name (2)",sorter:"string"},
-    {title:"Anchor Text (2)",   field:"Anchor Text (2)",  sorter:"string", formatter: "textarea"},
+    {title:"Anchor ID (1)",     field:"Anchor ID (1)",    visible:false},
+    {title:"Document Name (1)", field:"Document Name (1)",sorter:"string", headerFilter:"input", cellClick(e,cell){remote.ipcRenderer.send('open-anchor', cell.getRow()["Anchor ID (1)"])}},
+    {title:"Anchor Text (1)",   field:"Anchor Text (1)",  sorter:"string", formatter: "textarea", headerFilter:"input", cellClick(e,cell){remote.ipcRenderer.send('open-anchor', cell.getRow()["Anchor ID (1)"])}},
+    {title:"Anchor ID (2)",     field:"Anchor ID (2)",    visible:false},
+    {title:"Document Name (2)", field:"Document Name (2)",sorter:"string", headerFilter:"input", cellClick(e,cell){remote.ipcRenderer.send('open-anchor', cell.getRow()["Anchor ID (2)"])}},
+    {title:"Anchor Text (2)",   field:"Anchor Text (2)",  sorter:"string", formatter: "textarea", headerFilter:"input", cellClick(e,cell){remote.ipcRenderer.send('open-anchor', cell.getRow()["Anchor ID (2)"])}},
 ]
 
 const doc_columns = [
-    {title:"Link ID",         field:"Link ID",         sorter:"number"},
-    {title:"Link Name",       field:"Link Name",       sorter:"string"},
-    {title:"Link Description",field:"Link Description",sorter:"string", formatter: "textarea"},
-    {title:"Creation Date",   field:"Creation Date",   sorter:"date"},
-    {title:"Document Name",   field:"Document Name",   sorter:"string"},
-    {title:"Anchor Text",     field:"Anchor Text",     sorter:"string", formatter: "textarea"}
+    {title:"Link ID",            field:"Link ID",            sorter:"number"},
+    {title:"Link Name",          field:"Link Name",          sorter:"string", headerFilter:"input"},
+    {title:"Link Description",   field:"Link Description",   sorter:"string", formatter: "textarea", headerFilter:"input"},
+    {title:"Creation Date",      field:"Creation Date",      sorter:"date"},
+    {title:"Anchor ID",          field:"Anchor ID",          visible:false},
+    {title:"Document Name",      field:"Document Name",      sorter:"string", headerFilter:"input"},
+    {title:"Anchor Text",        field:"Anchor Text",        sorter:"string", formatter: "textarea", headerFilter:"input"},
+    {title:"Anchor ID (2)",      field:"Anchor ID (2)",      visible:false},
+    {title:"Other Document Name",field:"Other Document Name",sorter:"string", headerFilter:"input", visible:false},
+    {title:"Other Anchor Text",  field:"Other Anchor Text",  sorter:"string", formatter: "textarea", headerFilter:"input", visible:false}
 ]

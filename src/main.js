@@ -30,6 +30,7 @@ const dbFileName = 'mydatabase.sqlite'
 const db = new Database(appUserPath,dbFileName)
 global.sharedObj = {db: db}
 
+let menu
 let windowPDFList = []
 let documentWindowMap = {} //path to win - win mapping
 let idEditorMap = {} //path to win - win mapping
@@ -190,10 +191,10 @@ app.on('will-finish-launching', () => {
 app.on('ready', () => {
 
   if(process.platform == "darwin") {
-    const menu = menuMac
+    menu = menuMac
     Menu.setApplicationMenu(menu);
   } else {
-    const menu = menuNonMac
+    menu = menuNonMac
     Menu.setApplicationMenu(menu);
   }
   
@@ -306,6 +307,20 @@ app.on('window-all-closed', () => {
 })
 
 ////////////////////////////////////////Message Handeling////////////////////////////////////////
+
+ipcMain.on('open-anchor', (event, data) => {
+  anchor_id = data
+  db.getAnchorData(anchor_id).then( (data) => {
+    if(documentWindowMap[data.doc_name]) {
+      documentWindowMap[data.doc_name].webContents.send("focus-page", data.pdf_page)
+      documentWindowMap[data.doc_name].focus()
+    }
+    else{
+      if(data.file_type == "pdf") createPDFWindow(path.join(data.doc_path,data.doc_name),data.pdf_page)
+      else createEditorWindow("public/editor.html", path.join(data.doc_path,data.doc_name))
+    }
+  }).catch((err) => {console.log(err)});
+});
 
 ipcMain.on('open-other-link', (event, data) => {
   db.getOtherAnchorData(data.link_id, data.anchor_id).then( (data) => {
@@ -503,6 +518,24 @@ const menuMac = Menu.buildFromTemplate([
       }
     },
     {
+      label: 'Save PDF (without links)',
+      enabled: false,
+      id: 'save-pdf',
+      click: function(menuItem, currentWindow) {
+        if(!currentWindow) return
+        currentWindow.webContents.send("alert","Not yet implemented")
+      }
+    },
+    {
+      label: 'Export PDF (with links)',
+      enabled: false,
+      id: 'export-pdf',
+      click: function(menuItem, currentWindow) {
+        if(!currentWindow) return
+        currentWindow.webContents.send("alert","Not yet implemented")
+      }
+    },
+    {
       label: 'Close All',
       accelerator: "CmdOrCtrl+q",
       click: function() {
@@ -560,8 +593,8 @@ const menuMac = Menu.buildFromTemplate([
           createHTMLWindow('public/link-list.html').then( (win) => {
             win.webContents.once('dom-ready', () => {
               win.webContents.send('send-doc-name', doc_name)
-           }).catch((err) => {console.log(err)});
-          })
+           })
+          }).catch((err) => {console.log(err)});
         }
       }
     ]
@@ -593,6 +626,22 @@ const menuMac = Menu.buildFromTemplate([
           let data = {cancel : true}
           currentWindow.webContents.send('cancel-anchor', data) //cannot sent message directly to main
           currentWindow.webContents.send('forward-anchor', data)
+        }
+      },{
+        label: 'Copy with Link',
+        accelerator: "CmdOrCtrl+Shift+c",
+        enabled: false,
+        id: 'copy-link',
+        click: function(menuItem, currentWindow) {
+          //
+        }
+      },{
+        label: 'Paste with Link',
+        accelerator: "CmdOrCtrl+Shift+p",
+        enabled: false,
+        id: 'copy-link',
+        click: function(menuItem, currentWindow) {
+          //
         }
       }
     ]
@@ -655,7 +704,7 @@ const menuNonMac = Menu.buildFromTemplate([
       }
     },
     {
-      label: 'Save As',
+      label: 'Save Note As',
       accelerator: "CmdOrCtrl+Shift+s",
       id: 'save-text',
       click: function(menuItem, currentWindow) {
@@ -668,6 +717,24 @@ const menuNonMac = Menu.buildFromTemplate([
           currentWindow.send('saveTextAsHTML',filePath)
           documentWindowMap[path.basename(filePath)] = currentWindow
         }
+      }
+    },
+    {
+      label: 'Save PDF (without links)',
+      enabled: false,
+      id: 'save-pdf',
+      click: function(menuItem, currentWindow) {
+        if(!currentWindow) return
+        currentWindow.webContents.send("alert","Not yet implemented")
+      }
+    },
+    {
+      label: 'Export PDF (with links)',
+      enabled: false,
+      id: 'export-pdf',
+      click: function(menuItem, currentWindow) {
+        if(!currentWindow) return
+        currentWindow.webContents.send("alert","Not yet implemented")
       }
     },
     {
@@ -699,8 +766,8 @@ const menuNonMac = Menu.buildFromTemplate([
           createHTMLWindow('public/link-list.html').then( (win) => {
             win.webContents.once('dom-ready', () => {
               win.webContents.send('send-doc-name', doc_name)
-           }).catch((err) => {console.log(err)});
-          })
+           })
+          }).catch((err) => {console.log(err)});
         }
       }
     ]
