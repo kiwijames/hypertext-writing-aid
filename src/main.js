@@ -26,9 +26,10 @@ app.commandLine.appendSwitch ('ignore-certificate-errors', 'true');
 
 const appBasePath = app.getAppPath()
 const appUserPath = app.getPath("userData")
-const dbFileName = 'mydatabase.sqlite'
-const db = new Database(appUserPath,dbFileName)
-global.sharedObj = {db: db}
+//const dbFileName = 'mydatabase.sqlite'
+//const db = new Database(appUserPath,dbFileName)
+var db
+//global.sharedObj = {db: db}
 
 let menu
 let windowPDFList = []
@@ -190,6 +191,30 @@ app.on('will-finish-launching', () => {
 
 app.on('ready', () => {
 
+  let dbFileList = fs.readdirSync(appUserPath).filter(file => file.includes(".sqlite"))
+  let enqList = {}
+  dbFileList.forEach(file => {
+    enqList[path.basename(file).split(".")[0]] = path.basename(file).split(".")[0]
+  })
+
+  enquiryListPrompt.selectOptions = Object.assign({}, enqList)
+
+  // ask for which enq.
+  prompt(enquiryListPrompt).then( (result) => {
+  if(!result) {
+    prompt(enquiryNewPrompt).then( (result) => {
+      if(!result) app.quit()    
+      var dbFileName = result+'.sqlite'
+      db = new Database(appUserPath,dbFileName)
+      global.sharedObj = {db: db}
+
+
+
+
+
+
+        // DUPLICATED ! TODO: EXCLUDE IN FUNCTIONS OR USE SYNCHRONOUS PROMPTS
+
   if(process.platform == "darwin") {
     menu = menuMac
     Menu.setApplicationMenu(menu);
@@ -222,7 +247,6 @@ app.on('ready', () => {
   });
 
   if( (process.platform == 'win32' || process.platform == 'linux') && windowPDFList.length == 0) createEditorWindow('public/editor.html')
-
 
     //Check if files moved or modified
     db.getAllAnchors().then( (rows) => {
@@ -292,7 +316,126 @@ app.on('ready', () => {
       })
 
     }).catch((err) => {console.log(err)});
-  })
+
+
+
+
+
+    })
+  } else {
+    var dbFileName = result+'.sqlite'
+    db = new Database(appUserPath,dbFileName)
+    global.sharedObj = {db: db}
+  
+
+  // DUPLICATED ! TODO: EXCLUDE IN FUNCTIONS OR USE SYNCHRONOUS PROMPTS
+
+  if(process.platform == "darwin") {
+    menu = menuMac
+    Menu.setApplicationMenu(menu);
+  } else {
+    menu = menuNonMac
+    Menu.setApplicationMenu(menu);
+  }
+  
+  // If app is opend on windows by opening a file 
+  if (process.platform == 'win32' && process.argv.length >= 2) {
+    let openFilePath = process.argv[1];
+    let fileExtension = path.extname(openFilePath)
+    if (openFilePath !== "" && openFilePath.includes("pdf")) {
+      try{
+        createPDFWindow(openFilePath)}
+      catch(e){
+        dialog.showErrorBox("Problem opening PDF: ", e)
+      }
+    }
+  }
+
+  app.on('open-file', (event, path) => {
+    if (path !== "" && path.includes("pdf")) {
+      try{
+        createPDFWindow(path)
+      } catch(e){
+        dialog.showErrorBox("Problem opening PDF: ", e)
+      }
+    }
+  });
+
+  if( (process.platform == 'win32' || process.platform == 'linux') && windowPDFList.length == 0) createEditorWindow('public/editor.html')
+
+    //Check if files moved or modified
+    db.getAllAnchors().then( (rows) => {
+      let fullFilePathList = []
+      let fullLastModifiedList = []
+      rows.forEach( (row) => {
+        fullFilePath = path.join(row.doc_path,row.doc_name)
+        if(row.last_modified) fullLastModifiedList.push({file_path: fullFilePath, last_modified: row.last_modified})
+        if(!fullFilePathList.includes(fullFilePath)) fullFilePathList.push(fullFilePath)
+      })
+
+      let missingDocs = []
+      let modifiedDocs = []
+      fullFilePathList.forEach( (filePath) => {
+        if(!fs.existsSync(filePath)) missingDocs.push(filePath)
+      })
+      fullLastModifiedList.forEach( obj => {
+        if(!obj.file_path.includes("tbd") && fs.statSync(obj.file_path).mtime.toString() != obj.last_modified) modifiedDocs.push(obj.file_path)
+      })
+      console.log("missingDocs: "+JSON.stringify(missingDocs))
+      console.log("modifiedDocs: "+JSON.stringify(modifiedDocs))
+
+      missingDocs.forEach( (filePath) => {
+        let dialogOptions = {
+          type: 'info',
+          buttons: ['Set new file path', 'Remove links'],
+          defaultId: 1,
+          title: 'File not found',
+          message: 'A file with links has been moved, deleted or renamed.',
+          detail: filePath+' has not been found. Please set the new path to the file, otherwise the links will be removed.',
+        };
+        dialog.showMessageBox(null, dialogOptions, (response) => {
+          if(response == 0) {
+            newFilePath = dialog.showOpenDialog({ 
+              properties: ['openFile'],
+              filters: [
+                { name: "All Files", extensions: ["*"] }
+              ]
+            })
+            if(newFilePath) {
+              newFilePath = newFilePath[0]
+              db.updateFilePathForAllAnchors(path.basename(newFilePath),path.dirname(newFilePath))
+            }
+            else db.deleteLinksWithFilePath(path.basename(filePath))
+          }else {
+            db.deleteLinksWithFilePath(path.basename(filePath))
+          }
+        });
+      })
+
+      modifiedDocs.forEach( (filePath) => {
+        let dialogOptions = {
+          type: 'info',
+          buttons: ['Update all document anchors', 'Remove links'],
+          defaultId: 1,
+          title: 'File has been modified',
+          message: 'A file with links has been modified.',
+          detail: filePath+' has been modified. Please decide to keep or delete the links.',
+        };
+        dialog.showMessageBox(null, dialogOptions, (response) => {
+          if(response == 0) {
+            db.updateFilePathForAllAnchors(path.basename(filePath),path.dirname(filePath),fs.statSync(filePath).mtime.toString())
+          }else {
+            db.deleteLinksWithFilePath(path.basename(filePath))
+          }
+        });
+      })
+
+    }).catch((err) => {console.log(err)});
+  }
+  }
+
+  )
+})
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {    
@@ -416,6 +559,53 @@ ipcMain.on('delete-link', (event, data) => {
 })
 
 ////////////////////////////////////////////// const //////////////////////////////////////////////
+
+let enquiryNewPrompt = {
+  title: 'Create new enquiry',    
+  label: 'Enquriy name:',
+  alwaysOnTop: true, //allow the prompt window to stay over the main Window,
+  type: 'input',
+  width: 580, // window width
+  height: 300, // window height
+  resizable: true,
+  buttonsStyle: {
+    texts: {
+      ok_text: 'Select', //text for ok button
+      cancel_text: 'Create new Enquiry' //text for cancel button
+    }
+  },
+  selectOptions: { 
+    // to be filled
+  }
+}
+
+let enquiryListPrompt = {
+  title: 'Select Enquiry',    
+  label: 'Please select an enquiry.',
+  alwaysOnTop: true, //allow the prompt window to stay over the main Window,
+  type: 'select',
+  width: 580, // window width
+  height: 300, // window height
+  resizable: true,
+  buttonsStyle: {
+    texts: {
+      ok_text: 'Create', //text for ok button
+      cancel_text: 'Close application' //text for cancel button
+    }
+  },
+  inputArray: [
+    {
+      key: 'enquiry_name',
+      label: 'Enquriy Name:',
+      value: '',
+      useHtmlLabel: true,
+      attributes: { // Optionals attributes for input
+        placeholder: 'A enquiry name',
+        required: true, // If there is a missing required input the result will be null, the required input will be recognized from '*'
+        type: 'text',
+      }
+    }]
+}
 
 let linkSavingPromptOptions = {
   title: 'Save Link',    
@@ -589,12 +779,12 @@ const menuMac = Menu.buildFromTemplate([
     label: 'View',
     submenu: [
       {
-        label: 'View All Links',
+        label: 'View Enquriy Links',
         click: function() {
           createHTMLWindow('public/link-list.html') 
         }
       },{
-        label: 'View Document\'s Links',
+        label: 'View Document Links',
         click: function(menuItem, currentWindow) {
           if(!currentWindow) return
           let doc_name
@@ -762,12 +952,12 @@ const menuNonMac = Menu.buildFromTemplate([
     label: 'View',
     submenu: [
       {
-        label: 'View All Links',
+        label: 'View Enquiry Links',
         click: function() {
           createHTMLWindow('public/link-list.html') 
         }
       },{
-        label: 'View Document\'s Links',
+        label: 'View Document Links',
         click: function(menuItem, currentWindow) {
           if(!currentWindow) return
           let doc_name
