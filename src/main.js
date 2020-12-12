@@ -221,7 +221,7 @@ app.on('ready', () => {
     }
   });
 
-  if(process.platform == 'win32' && windowPDFList.length == 0) createEditorWindow('public/editor.html')
+  if( (process.platform == 'win32' || process.platform == 'linux') && windowPDFList.length == 0) createEditorWindow('public/editor.html')
 
 
     //Check if files moved or modified
@@ -365,20 +365,30 @@ ipcMain.on('send-anchor', (event, data) => {
     menu.getMenuItemById('start-link').enabled = true
     menu.getMenuItemById('finish-link').enabled = false
     menu.getMenuItemById('cancel-link').enabled = false
-    prompt(linkSavingPromptOptions, BrowserWindow.fromId(data.windowId_2)).then((result) => {
-      if(!result) {
-        data = {}
-        event.sender.webContents.send("alert", "Linking canceled")
-        return
-      }
-      db.createLinkWithAnchors(result["link_name"],result["link_description"],data.anchor_1,data.anchor_2).then( (link_ids) => {
-        data.link_id = link_ids.link_id
-        data.anchor_id_1 = link_ids.anchor_id_1
-        data.anchor_id_2 = link_ids.anchor_id_2
-        BrowserWindow.fromId(data.windowId_1).webContents.send('put-link', data)
-        if(data.windowId_1 != data.windowId_2) BrowserWindow.fromId(data.windowId_2).webContents.send('put-link', data)
-        data = {}
+
+    db.getAllLinkTags().then((result) => {
+      let options = ""
+      result.forEach(tag => {
+        options += "<option>"+tag["link_tag"]+"</option>"
       })
+    let tmpLabel = linkSavingPromptOptions["inputArray"][0]["label"]
+    linkSavingPromptOptions["inputArray"][0]["label"] = tmpLabel.split("<select>")[0]+ "<select>" + options + "</select>" + tmpLabel.split("</select>")[1]
+    
+      prompt(linkSavingPromptOptions, BrowserWindow.fromId(data.windowId_2)).then((result) => {
+        if(!result) {
+          data = {}
+          event.sender.webContents.send("alert", "Linking canceled")
+          return
+        }
+        db.createLinkWithAnchors(result["link_tag"],result["link_description"],data.anchor_1,data.anchor_2).then( (link_ids) => {
+          data.link_id = link_ids.link_id
+          data.anchor_id_1 = link_ids.anchor_id_1
+          data.anchor_id_2 = link_ids.anchor_id_2
+          BrowserWindow.fromId(data.windowId_1).webContents.send('put-link', data)
+          if(data.windowId_1 != data.windowId_2) BrowserWindow.fromId(data.windowId_2).webContents.send('put-link', data)
+          data = {}
+        })
+      }).catch((err) => {console.log(err)});
     }).catch((err) => {console.log(err)});
   } else {
     menu.getMenuItemById('start-link').enabled = false
@@ -396,18 +406,18 @@ ipcMain.on('delete-link', (event, data) => {
   db.getFullLinkData(link_id).then( (data) => {
     db.deleteLinkById(link_id) //maybe promise necessary
 
-    if(documentWindowMap[data.doc_name_1]){
-      documentWindowMap[data.doc_name_1].webContents.send("remove-link", link_id)
+    if(documentWindowMap[data.doc_tag_1]){
+      documentWindowMap[data.doc_tag_1].webContents.send("remove-link", link_id)
     }
-    if(documentWindowMap[data.doc_name_2]){
-      documentWindowMap[data.doc_name_2].webContents.send("remove-link", link_id)
+    if(documentWindowMap[data.doc_tag_2]){
+      documentWindowMap[data.doc_tag_2].webContents.send("remove-link", link_id)
     }
   })
 })
 
 ////////////////////////////////////////////// const //////////////////////////////////////////////
 
-const linkSavingPromptOptions = {
+let linkSavingPromptOptions = {
   title: 'Save Link',    
   label: 'Please input the values to describe the link.',
   alwaysOnTop: true, //allow the prompt window to stay over the main Window,
@@ -420,25 +430,26 @@ const linkSavingPromptOptions = {
       ok_text: 'Save', //text for ok button
       cancel_text: 'Throw away' //text for cancel button
     }
-  },   
+  },
   // input multi-input options **NEEDED ONLY IF TYPE IS MULTI-INPUT**
 
   inputArray: [
     {
-      key: 'link_name',
-      label: 'Link Name',
+      key: 'link_tag',
+      label: 'Link Tag* <h6 style="display:inline;">(Currently used: <select><option>tbd</option><option>example</option></select>)</h6>:',
       value: '',
+      useHtmlLabel: true,
       attributes: { // Optionals attributes for input
-        placeholder: 'some link name',
-        required: false, // If there is a missing required input the result will be null, the required input will be recognized from '*'
+        placeholder: 'A link tag',
+        required: true, // If there is a missing required input the result will be null, the required input will be recognized from '*'
         type: 'text',
       }
     },{
       key: 'link_description',
-      label: 'Link Description',
+      label: 'Link Description:',
       value: '',
       attributes: { // Optionals attributes for input
-        placeholder: 'a description',
+        placeholder: 'A link description',
         required: false, // If there is a missing required input the result will be null, the required input will be recognized from '*'
         type: 'text',
       }

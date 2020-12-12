@@ -128,17 +128,17 @@ module.exports = class Database {
 
   /**
    * Creates a link with the given data and anchors. The anchor objects need to be in the proper format.
-   * @param  {String} link_name Name of the link
+   * @param  {String} link_tag Tag of the link
    * @param  {String} link_description Description of the link
    * @param  {Object} anchor_1 First anchor object
    * @param  {Object} anchor_2 Second anchor oject
    */
-  createLinkWithAnchors(link_name, link_description, anchor_1, anchor_2) {
+  createLinkWithAnchors(link_tag, link_description, anchor_1, anchor_2) {
     return new Promise((resolve, reject) => {
       this.createAnchor(anchor_1).then((anchor_id_1) => {
         this.createAnchor(anchor_2).then((anchor_id_2) => {
           let link = {
-            $link_name: link_name,
+            $link_tag: link_tag,
             $link_description: link_description,
             $anchor_id_1: anchor_id_1,
             $anchor_id_2: anchor_id_2,
@@ -163,8 +163,8 @@ module.exports = class Database {
   createLink(link) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        "INSERT INTO 'link' (link_name,link_description,anchor_id_1,anchor_id_2) \
-            VALUES($link_name,$link_description,$anchor_id_1,$anchor_id_2)",
+        "INSERT INTO 'link' (link_tag,link_description,anchor_id_1,anchor_id_2) \
+            VALUES($link_tag,$link_description,$anchor_id_1,$anchor_id_2)",
         link,
         function (err) {
           if (err) eject(err);
@@ -205,6 +205,18 @@ module.exports = class Database {
       });
     });
   }
+  /**
+   * Returns all distinct tags from the link table
+   * @return  {[Object]} list of sqlite3 database objects
+   */
+  getAllLinkTags() {
+    return new Promise((resolve, reject) => {
+      this.db.all("SELECT DISTINCT link_tag from link", (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+  }
 
   /**
    * Returns a promise returning all links with anchor data
@@ -213,9 +225,9 @@ module.exports = class Database {
   getAllLinks() {
     return new Promise((resolve, reject) => {
       this.db.all(
-        "SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, l.anchor_id_1, l.anchor_id_2, \
-            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
-            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
+        "SELECT l.link_id link_id, l.link_tag link_tag, l.link_description link_description, l.creation_date, l.anchor_id_1, l.anchor_id_2, \
+            a1.doc_name doc_tag_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
+            a2.doc_name doc_tag_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
             FROM link l\
             INNER JOIN anchor AS a1 ON a1.anchor_id = l.anchor_id_1 \
             INNER JOIN anchor AS a2 ON a2.anchor_id = l.anchor_id_2",
@@ -235,9 +247,9 @@ module.exports = class Database {
   getAllLinksOfDoc(doc_name) {
     return new Promise((resolve, reject) => {
       this.db.all(
-        "SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, l.anchor_id_1, l.anchor_id_2, \
-            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
-            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
+        "SELECT l.link_id link_id, l.link_tag link_tag, l.link_description link_description, l.creation_date, l.anchor_id_1, l.anchor_id_2, \
+            a1.doc_name doc_tag_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
+            a2.doc_name doc_tag_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
             FROM link l\
             INNER JOIN anchor AS a1 ON a1.anchor_id = l.anchor_id_1 \
             INNER JOIN anchor AS a2 ON a2.anchor_id = l.anchor_id_2 \
@@ -315,9 +327,9 @@ module.exports = class Database {
   getFullLinkData(link_id) {
     return new Promise((resolve, reject) => {
       this.db.get(
-        "SELECT l.link_id link_id, l.link_name link_name, l.link_description link_description, l.creation_date, \
-            a1.doc_name doc_name_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
-            a2.doc_name doc_name_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
+        "SELECT l.link_id link_id, l.link_tag link_tag, l.link_description link_description, l.creation_date, \
+            a1.doc_name doc_tag_1, a1.doc_path doc_path_1, a1.anchor_text anchor_text_1, a1.pdf_quads pdf_quads_1, a1.pdf_page pdf_page_1, a1.doc_position doc_position_1, a1.file_type file_type_1, a1.last_modified last_modified_1, \
+            a2.doc_name doc_tag_2, a2.doc_path doc_path_2, a2.anchor_text anchor_text_2, a2.pdf_quads pdf_quads_2, a2.pdf_page pdf_page_2, a2.doc_position doc_position_2, a2.file_type file_type_2, a2.last_modified last_modified_2 \
             FROM link l\
             INNER JOIN anchor AS a1 ON a1.anchor_id = l.anchor_id_1 \
             INNER JOIN anchor AS a2 ON a2.anchor_id = l.anchor_id_2 \
@@ -385,7 +397,7 @@ module.exports = class Database {
 const createLinkTable =
   "CREATE TABLE link (\
     link_id INTEGER PRIMARY KEY AUTOINCREMENT,\
-    link_name TEXT,\
+    link_tag TEXT,\
     link_description TEXT,\
     anchor_id_1 INTEGER NOT NULL,\
     anchor_id_2 INTEGER NOT NULL,\

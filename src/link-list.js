@@ -16,14 +16,14 @@ db.getAllLinks().then( (rows) => {
         tabledata.push(
             {
                 "Link ID": row.link_id,
-                "Link Name": row.link_name,
+                "Link Tag": row.link_tag,
                 "Link Description": row.link_description,
                 "Creation Date": row.creation_date,
                 "Anchor ID (1)": row.anchor_id_1,
-                "Document Name (1)": row.doc_name_1,
+                "Document Name (1)": row.doc_tag_1,
                 "Anchor Text (1)": row.anchor_text_1,
                 "Anchor ID (2)": row.anchor_id_2,
-                "Document Name (2)": row.doc_name_2,
+                "Document Name (2)": row.doc_tag_2,
                 "Anchor Text (2)": row.anchor_text_2,
             }
         )
@@ -59,14 +59,14 @@ ipcRenderer.on('send-doc-name', (event, data) => {
             tabledata.push(
                 {
                     "Link ID": row.link_id,
-                    "Link Name": row.link_name,
+                    "Link Tag": row.link_tag,
                     "Link Description": row.link_description,
                     "Creation Date": row.creation_date,
                     "Anchor ID (1)": row.anchor_id_1,
-                    "Document Name (1)": row.doc_name_1,
+                    "Document Name (1)": row.doc_tag_1,
                     "Anchor Text (1)": row.anchor_text_1,
                     "Anchor ID (2)": row.anchor_id_2,
-                    "Document Name (2)": row.doc_name_2,
+                    "Document Name (2)": row.doc_tag_2,
                     "Anchor Text (2)": row.anchor_text_2,
                 }
             )
@@ -81,7 +81,7 @@ ipcRenderer.on('send-doc-name', (event, data) => {
 //////////////////////////////////// const ////////////////////////////////////
 const all_columns = [
     {title:"Link ID",           field:"Link ID",          sorter:"number"},
-    {title:"Link Name",         field:"Link Name",        sorter:"string", headerFilter:"input"},
+    {title:"Link Tag",         field:"Link Tag",        sorter:"string", headerFilter:"input"},
     {title:"Link Description",  field:"Link Description", sorter:"string", formatter: "textarea", headerFilter:"input"},
     {title:"Creation Date",     field:"Creation Date",    sorter:"date"},
     {title:"Anchor ID (1)",     field:"Anchor ID (1)",    visible:false},
@@ -94,7 +94,7 @@ const all_columns = [
 
 const doc_columns = [
     {title:"Link ID",            field:"Link ID",            sorter:"number"},
-    {title:"Link Name",          field:"Link Name",          sorter:"string", headerFilter:"input"},
+    {title:"Link Tag",          field:"Link Tag",          sorter:"string", headerFilter:"input"},
     {title:"Link Description",   field:"Link Description",   sorter:"string", formatter: "textarea", headerFilter:"input"},
     {title:"Creation Date",      field:"Creation Date",      sorter:"date"},
     {title:"Anchor ID",          field:"Anchor ID",          visible:false},
