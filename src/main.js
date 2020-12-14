@@ -26,7 +26,7 @@ app.commandLine.appendSwitch ('ignore-certificate-errors', 'true');
 
 const appBasePath = app.getAppPath()
 const appUserPath = app.getPath("userData")
-//const dbFileName = 'mydatabase.sqlite'
+var dbFileName = 'mydatabase.sqlite'
 //const db = new Database(appUserPath,dbFileName)
 var db
 //global.sharedObj = {db: db}
@@ -204,7 +204,7 @@ app.on('ready', () => {
   if(!result) {
     prompt(enquiryNewPrompt).then( (result) => {
       if(!result) app.quit()    
-      var dbFileName = result+'.sqlite'
+      dbFileName = result+'.sqlite'
       db = new Database(appUserPath,dbFileName)
       global.sharedObj = {db: db}
 
@@ -728,9 +728,18 @@ const menuMac = Menu.buildFromTemplate([
       }
     },
     {
-      label: 'Export PDF (with links)',
+      label: 'Export Enquiry',
       enabled: false,
-      id: 'export-pdf',
+      id: 'export-enq',
+      click: function(menuItem, currentWindow) {
+        if(!currentWindow) return
+        currentWindow.webContents.send("alert","Not yet implemented")
+      }
+    },
+    {
+      label: 'Import Enquiry',
+      enabled: false,
+      id: 'import-enq',
       click: function(menuItem, currentWindow) {
         if(!currentWindow) return
         currentWindow.webContents.send("alert","Not yet implemented")
