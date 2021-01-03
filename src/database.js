@@ -283,6 +283,22 @@ module.exports = class Database {
   }
 
   /**
+   * Returns all documents files and paths belonging to a enquriy
+   * @return  {[Object]} list of sqlite3 database objects
+   */
+  getAllEnquiryDocs() {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        "SELECT DISTINCT doc_name, doc_path FROM anchor",
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+  }
+
+  /**
    * Returns a promise given a link_id and anchor_id the other corresponding anchor is given.
    * @param  {Number} link_id id of the link
    * @param  {Number} anchor_id id of the anchor

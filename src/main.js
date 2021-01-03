@@ -7,9 +7,12 @@
 
 const { app, BrowserWindow, webContents, ipcMain, dialog, Menu } = require('electron');
 const fs = require('fs');
+const os = require('os');  
 const path = require('path');
+const archiver = require('archiver');
 const Database = require('./database.js');
 const prompt = require('electron-multi-prompt');
+const del = require('del');
 
 /**
   * Check to disallow mutliple instances of the app
@@ -26,7 +29,8 @@ app.commandLine.appendSwitch ('ignore-certificate-errors', 'true');
 
 const appBasePath = app.getAppPath()
 const appUserPath = app.getPath("userData")
-var dbFileName = 'mydatabase.sqlite'
+const tmpDir = os.tmpdir()
+var dbFileName = ''
 //const db = new Database(appUserPath,dbFileName)
 var db
 //global.sharedObj = {db: db}
@@ -323,7 +327,7 @@ app.on('ready', () => {
 
     })
   } else {
-    var dbFileName = result+'.sqlite'
+    dbFileName = result+'.sqlite'
     db = new Database(appUserPath,dbFileName)
     global.sharedObj = {db: db}
   
@@ -729,11 +733,58 @@ const menuMac = Menu.buildFromTemplate([
     },
     {
       label: 'Export Enquiry',
-      enabled: false,
+      enabled: true,
       id: 'export-enq',
       click: function(menuItem, currentWindow) {
-        if(!currentWindow) return
-        currentWindow.webContents.send("alert","Not yet implemented")
+        // Create tmp path for consoldating files
+        tmpFolder = path.join(appUserPath,'tmp-enq-export')
+        fs.mkdirSync(tmpFolder)
+        
+        // Get all files of an enq and copy into temp folder
+        db.getAllEnquiryDocs().then( (entries) => {
+          console.log(entries)
+          entries.forEach(entry => {
+            doc = path.join(entry.doc_path,entry.doc_name)
+            doc_copy = path.join(tmpFolder,entry.doc_name)
+            //console.log(entry,doc,doc_copy)
+            if(fs.existsSync(doc)) {
+              console.log(doc+" exist")
+              fs.copyFileSync(doc,doc_copy)
+            }
+          });
+
+          // Archive all documents
+          outputTarget = path.join(appUserPath,dbFileName+".zip")
+          let output = fs.createWriteStream(outputTarget);
+          console.log(outputTarget)
+          let archive = archiver('zip');
+          output.on('close', () => { console.log(archive.pointer() + ' total bytes; archiver has been finalized and the output file descriptor has closed.'); });
+          archive.on('error', (err) => {console.log(err)});
+          archive.pipe(output);
+          archive.directory(tmpFolder, false);
+          archive.append(fs.createReadStream(path.join(app.getPath("userData"), dbFileName )), { name: dbFileName });
+          archive.finalize();
+
+          // Ask user where to save
+          dialog.showSaveDialog({defaultPath: '~/'+path.basename(dbFileName, '.sqlite')+'.zip'}, (newArchivePath, err) => {
+            if (err) {
+              del([outputTarget],{force:true})
+              console.log(err) 
+            } else{
+              // Moves file to user specified path
+              fs.rename(outputTarget, newArchivePath, function (err) {
+                if (err) {
+                  del([outputTarget],{force:true})
+                  console.log(err)
+                }
+              })
+            }
+
+            // Clean up and remove temporary folder
+            del([tmpFolder+'/*'],{force:true})
+            del([tmpFolder],{force:true})
+          })
+        }).catch((err) => {console.log(err)});
       }
     },
     {
