@@ -127,6 +127,24 @@ module.exports = class Database {
   }
 
   /**
+   * Updates path after importing a enquiry
+   * @param  {String} doc_path Path to the document
+   */
+  updatePathsAfterImport(doc_path, importDbPath) {
+    console.log("updatePathsAfterImport called with "+doc_path)
+    let tmpDb = this.initDatabase(importDbPath);
+    tmpDb.run(
+      "UPDATE anchor \
+       SET doc_path = ?",
+      doc_path,
+      function (err) {
+        if (err) console.log(err);
+      }
+    );
+    //tmpDb.close();
+  }
+
+  /**
    * Creates a link with the given data and anchors. The anchor objects need to be in the proper format.
    * @param  {String} link_tag Tag of the link
    * @param  {String} link_description Description of the link

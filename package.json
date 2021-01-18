@@ -24,9 +24,11 @@
   },
   "dependencies": {
     "@pdftron/webviewer": "^7.0.0",
+    "adm-zip": "^0.5.1",
     "archiver": "^5.1.0",
     "del": "^6.0.0",
     "electron-multi-prompt": "^1.0.5",
+    "prompt": "^1.1.0",
     "sqlite3": "^5.0.0",
     "tabulator-tables": "^4.8.2"
   },

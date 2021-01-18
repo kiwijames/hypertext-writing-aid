@@ -10,8 +10,10 @@ const fs = require('fs');
 const os = require('os');  
 const path = require('path');
 const archiver = require('archiver');
+const AdmZip = require('adm-zip');
 const Database = require('./database.js');
 const prompt = require('electron-multi-prompt');
+const simplePrompt = require('prompt');
 const del = require('del');
 
 /**
@@ -784,16 +786,64 @@ const menuMac = Menu.buildFromTemplate([
             del([tmpFolder+'/*'],{force:true})
             del([tmpFolder],{force:true})
           })
+          currentWindow.webContents.send("alert","Finished export of enquiry.")
         }).catch((err) => {console.log(err)});
       }
     },
     {
       label: 'Import Enquiry',
-      enabled: false,
+      enabled: true,
       id: 'import-enq',
       click: function(menuItem, currentWindow) {
-        if(!currentWindow) return
-        currentWindow.webContents.send("alert","Not yet implemented")
+        // Get archive to import from user
+        archivePath = dialog.showOpenDialog({ 
+            properties: ['openFile'],
+            filters: [
+              { name: "ZIP", extensions: ["zip"] }
+            ]
+          })
+        if(!archivePath) return
+        // Create tmp path for unpacking files
+        tmpFolder = path.join(appUserPath,'tmp-enq-import')
+        fs.mkdirSync(tmpFolder)
+
+        archivePath = archivePath[0]
+        console.log("extracting ",archivePath," to ",tmpFolder)
+        let zip = new AdmZip(archivePath)
+        zip.extractAllTo(tmpFolder+"/", true);
+
+        archivePathReal = path.join(tmpFolder,path.parse(archivePath).name+"/");
+        //get sqlite path
+        let files = fs.readdirSync(archivePathReal);
+
+          sqliteFileName = files.filter( function(file){
+            return file.includes("sqlite")
+          })[0]
+          console.log(sqliteFileName)
+          let dbFile = path.join(archivePathReal,sqliteFileName)
+          //tmpFolder+"/new3.sqlite"//files.filter( function( elm ) {return elm.match("/.*\.(sqlite)/ig")})[0] //get first (and only sqlite file from archive)
+
+          // Moves database to appUserPath
+          let newDbPath = path.join(appUserPath, path.basename(dbFile))
+          fs.rename(dbFile, newDbPath, function (err) {
+            if (err) console.log(err)
+              del([dbFile],{force:true})
+          })
+          extractPath = dialog.showOpenDialog({ properties: ['openDirectory'] });
+          console.log("extractPath: "+ extractPath)
+          files = fs.readdirSync(archivePathReal);
+          console.log("files: "+ files)
+          files.forEach( file => {
+            console.log("file in foreach: "+file)
+            fs.rename(path.join(archivePathReal,file), path.join(""+extractPath,file), function (err) {
+              if (err) { console.log(err) }
+              else {
+                db.updatePathsAfterImport(""+extractPath,newDbPath) 
+              }
+            })
+          })
+          //currentWindow.webContents.send("alert","Finished import of enquiry.")
+
       }
     },
     {
