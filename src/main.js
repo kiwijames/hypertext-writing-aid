@@ -492,6 +492,29 @@ ipcMain.on('saveTextAsHTML-step2',(event, data) => {
   })
 });
 
+ipcMain.on('copy-link',(eventCopy, dataCopy) => {
+    menu.getMenuItemById('copy-link').enabled = false
+    menu.getMenuItemById('paste-link').enabled = true
+  ipcMain.once('paste-link', (event, data) => {
+    menu.getMenuItemById('copy-link').enabled = true
+    menu.getMenuItemById('paste-link').enabled = false
+    data.anchor_2.$anchor_text = dataCopy.anchor_1.$anchor_text
+    data.anchor_1 = dataCopy.anchor_1
+
+    db.createLinkWithAnchors("citation","",data.anchor_1,data.anchor_2).then( (link_ids) => {
+      data.link_id = link_ids.link_id
+      data.anchor_id_1 = link_ids.anchor_id_1
+      data.anchor_id_2 = link_ids.anchor_id_2
+
+      // send ids to pages for link updates
+      event.sender.webContents.send("paste-link",data)
+      eventCopy.sender.webContents.send("copy-link",data)
+    })
+  })
+
+
+});
+
 ipcMain.on('send-anchor', (event, data) => {
   if(data.cancel) {
     menu.getMenuItemById('start-link').enabled = true
@@ -703,7 +726,7 @@ const menuMac = Menu.buildFromTemplate([
       }
     },
     {
-      label: 'New Note Edtior',
+      label: 'New Note Editor',
       accelerator: "CmdOrCtrl+n",
       click: function() {
         createEditorWindow('public/editor.html')          
@@ -783,10 +806,11 @@ const menuMac = Menu.buildFromTemplate([
             }
 
             // Clean up and remove temporary folder
-            del([tmpFolder+'/*'],{force:true})
-            del([tmpFolder],{force:true})
+            del([path.join(tmpFolder+'/*')],{force:true})
+            del([path.join(tmpFolder,'/')],{force:true})
+
+            dialog.showMessageBox({buttons: ["OK"],message: "Export finished."});
           })
-          currentWindow.webContents.send("alert","Finished export of enquiry.")
         }).catch((err) => {console.log(err)});
       }
     },
@@ -812,7 +836,9 @@ const menuMac = Menu.buildFromTemplate([
         let zip = new AdmZip(archivePath)
         zip.extractAllTo(tmpFolder+"/", true);
 
-        archivePathReal = path.join(tmpFolder,path.parse(archivePath).name+"/");
+        archivePathReal = tmpFolder
+        //path.join(tmpFolder,path.parse(archivePath).name+"/");
+        
         //get sqlite path
         let files = fs.readdirSync(archivePathReal);
 
@@ -821,10 +847,9 @@ const menuMac = Menu.buildFromTemplate([
           })[0]
           console.log(sqliteFileName)
           let dbFile = path.join(archivePathReal,sqliteFileName)
-          //tmpFolder+"/new3.sqlite"//files.filter( function( elm ) {return elm.match("/.*\.(sqlite)/ig")})[0] //get first (and only sqlite file from archive)
-
+         
           // Moves database to appUserPath
-          let newDbPath = path.join(appUserPath, path.basename(dbFile))
+          let newDbPath = path.join(appUserPath, path.parse(archivePath).name+".sqlite")
           fs.rename(dbFile, newDbPath, function (err) {
             if (err) console.log(err)
               del([dbFile],{force:true})
@@ -842,8 +867,13 @@ const menuMac = Menu.buildFromTemplate([
               }
             })
           })
-          //currentWindow.webContents.send("alert","Finished import of enquiry.")
 
+          // Clean up and remove temporary folder
+          del([path.join(archivePathReal,'/*')],{force:true})
+          del([path.join(tmpFolder+'/*/')],{force:true})
+          del([path.join(tmpFolder,'/')],{force:true})
+
+          dialog.showMessageBox({buttons: ["OK"],message: "Import finished."});
       }
     },
     {
@@ -941,18 +971,18 @@ const menuMac = Menu.buildFromTemplate([
       },{
         label: 'Copy with Link',
         accelerator: "CmdOrCtrl+Shift+c",
-        enabled: false,
+        enabled: true,
         id: 'copy-link',
         click: function(menuItem, currentWindow) {
-          //
+          currentWindow.webContents.send('copy-link')
         }
       },{
         label: 'Paste with Link',
         accelerator: "CmdOrCtrl+Shift+p",
         enabled: false,
-        id: 'copy-link',
+        id: 'paste-link',
         click: function(menuItem, currentWindow) {
-          //
+          currentWindow.webContents.send('paste-link')
         }
       }
     ]
@@ -1008,7 +1038,7 @@ const menuNonMac = Menu.buildFromTemplate([
       }
     },
     {
-      label: 'New Note Edtior',
+      label: 'New Note Editor',
       accelerator: "CmdOrCtrl+n",
       click: function() {
         createEditorWindow('public/editor.html')          

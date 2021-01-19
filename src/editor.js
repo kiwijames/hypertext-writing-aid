@@ -148,6 +148,38 @@ ipcRenderer.on("get-anchor", (event, data) => {
   }
 });
 
+ipcRenderer.on("paste-link", (event, data) => {
+      if (!data) {
+        anchor = {
+          $doc_name: "tbd",
+          $doc_path: "tbd",
+          $pdf_quads: "",
+          $pdf_page: "",
+          $file_type: "text",
+          $anchor_text: "" , //fill with link quote
+          $doc_position: "",
+          $last_modified: "tbd",
+        };
+        let data = {}
+        data.anchor_2 = anchor;
+        data.windowId_2 = remote.getCurrentWindow().id;
+        ipcRenderer.send("paste-link", data);
+      }
+      else {
+        let textBox = document.getElementById("textBox");
+        let text = window.getSelection();
+        let newTextElement = document.createElement("a");
+        newTextElement.appendChild(document.createTextNode(data.anchor_2.$anchor_text));
+        newTextElement.setAttribute("href", "#");
+
+        linkingFunction = "callinternalLink(" + data.link_id + ", " + data.anchor_id_2 + ");";
+        newTextElement.setAttribute("onclick", linkingFunction);
+        let range = text.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(newTextElement);
+      }
+    });
+
 /**
  * Needs to be put into the editor.html file! It is activated as onclick-Event of the links
  * @param  {Number} link_id Link ID

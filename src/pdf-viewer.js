@@ -145,6 +145,38 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
           highlightQuads(Annotations, annotManager, data.anchor_2.$pdf_quads, data.link_id, data.anchor_id_2, data.anchor_1.$doc_name, data.anchor_1.$anchor_text, data.anchor_1.$pdf_page);
         }
       });
+
+      ipcRenderer.on("copy-link", (event, data) => {
+        if(!data) {
+          let page = docViewer.getCurrentPage();
+          let quads = docViewer.getSelectedTextQuads();
+          let text = docViewer.getSelectedText();
+          if (quads == null) {
+            alert("Please select the text to be linked.");
+          } else {
+            anchor = {
+              $doc_name: pdfFileName,
+              $doc_path: pdfFilePath,
+              $pdf_quads: quads,
+              $pdf_page: page,
+              $file_type: "pdf",
+              $anchor_text: text,
+              $doc_position: "", // empty, because pdf
+              $last_modified: "", // empty, because pdf
+            };
+            data = {
+              anchor_1: anchor,
+              windowId_1: remote.getCurrentWindow().id,
+            };
+            
+            alert("'" + text + "' selected.");
+            event.sender.send("copy-link", data);
+          }
+        } else {
+          highlightQuads(Annotations, annotManager, data.anchor_1.$pdf_quads, data.link_id, data.anchor_id_1, data.anchor_2.$doc_name, data.anchor_2.$anchor_text, data.anchor_1.$pdf_page);
+        }
+      });
+
     });
   }).catch((err) => {console.log(err)});
 }
