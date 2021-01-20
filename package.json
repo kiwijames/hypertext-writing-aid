@@ -28,6 +28,7 @@
     "archiver": "^5.1.0",
     "del": "^6.0.0",
     "electron-multi-prompt": "^1.0.5",
+    "file-saver": "^2.0.5",
     "prompt": "^1.1.0",
     "sqlite3": "^5.0.0",
     "tabulator-tables": "^4.8.2"

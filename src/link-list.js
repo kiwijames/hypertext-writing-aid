@@ -85,11 +85,11 @@ const all_columns = [
     {title:"Link Description",  field:"Link Description", sorter:"string", formatter: "textarea", headerFilter:"input"},
     {title:"Creation Date",     field:"Creation Date",    sorter:"date"},
     {title:"Anchor ID (1)",     field:"Anchor ID (1)",    visible:false},
-    {title:"Document Name (1)", field:"Document Name (1)",sorter:"string", headerFilter:"input", cellClick(e,cell){remote.ipcRenderer.send('open-anchor', cell.getRow()["Anchor ID (1)"])}},
-    {title:"Anchor Text (1)",   field:"Anchor Text (1)",  sorter:"string", formatter: "textarea", headerFilter:"input", cellClick(e,cell){remote.ipcRenderer.send('open-anchor', cell.getRow()["Anchor ID (1)"])}},
+    {title:"Document Name (1)", field:"Document Name (1)",sorter:"string", headerFilter:"input", cellClick(e,cell){ipcRenderer.send('open-anchor', cell.getRow().getData()["Anchor ID (1)"]);}},
+    {title:"Anchor Text (1)",   field:"Anchor Text (1)",  sorter:"string", formatter: "textarea", headerFilter:"input", cellClick(e,cell){ipcRenderer.send('open-anchor', cell.getRow().getData()["Anchor ID (1)"])}},
     {title:"Anchor ID (2)",     field:"Anchor ID (2)",    visible:false},
-    {title:"Document Name (2)", field:"Document Name (2)",sorter:"string", headerFilter:"input", cellClick(e,cell){remote.ipcRenderer.send('open-anchor', cell.getRow()["Anchor ID (2)"])}},
-    {title:"Anchor Text (2)",   field:"Anchor Text (2)",  sorter:"string", formatter: "textarea", headerFilter:"input", cellClick(e,cell){remote.ipcRenderer.send('open-anchor', cell.getRow()["Anchor ID (2)"])}},
+    {title:"Document Name (2)", field:"Document Name (2)",sorter:"string", headerFilter:"input", cellClick(e,cell){ipcRenderer.send('open-anchor', cell.getRow().getData()["Anchor ID (2)"])}},
+    {title:"Anchor Text (2)",   field:"Anchor Text (2)",  sorter:"string", formatter: "textarea", headerFilter:"input", cellClick(e,cell){ipcRenderer.send('open-anchor', cell.getRow().getData()["Anchor ID (2)"])}},
 ]
 
 const doc_columns = [

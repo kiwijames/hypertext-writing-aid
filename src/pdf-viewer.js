@@ -9,12 +9,14 @@ const { ipcRenderer, remote, app } = require("electron");
 const path = require("path");
 const appBasePath = remote.app.getAppPath();
 const db = remote.getGlobal("sharedObj").db;
-
+const FileSaver = require('file-saver');
+var pdfFilePathFullSave;
 /**
  * Renderer gets sent the pdf file when ready
  */
 ipcRenderer.once("pdfFile", (event, pdfFile, pageNumber, quads, link_id) => {
   var pdfFilePathFull = path.resolve(pdfFile);
+  pdfFilePathFullSave = pdfFilePathFull;
   createPDFViewer(pdfFilePathFull, pageNumber, quads, link_id, appBasePath);
 });
 
@@ -177,6 +179,17 @@ function createPDFViewer(pdfFilePathFull, pageNumber = 1, quads, link_id, appBas
         }
       });
 
+      ipcRenderer.on("save-pdf", (event) => {
+        let doc = docViewer.getDocument();
+        //TODO: Remove all link annotations
+        let data = doc.getFileData().then(data => {
+          let arr = new Uint8Array(data);
+          let blob = new Blob([arr], { type: 'application/pdf' });
+          // Path has to be selected by the user because security restrictions in the File API.
+          FileSaver.saveAs(blob, path.basename(pdfFilePathFullSave)); 
+        });
+      });
+
     });
   }).catch((err) => {console.log(err)});
 }
@@ -224,7 +237,7 @@ function loadAllAnchorsWithLinks(Annotations, annotManager, pdfFileName) {
         quads = JSON.parse(row.pdf_quads);
         highlightQuads( Annotations, annotManager, quads, row.link_id, row.anchor_id, other_rows.doc_name, other_rows.anchor_text, other_rows.pdf_page);
 
-      })
+      }).catch((err) => {console.log(err)});
     })
   }).catch((err) => {console.log(err)});
 }

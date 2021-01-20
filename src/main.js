@@ -62,7 +62,8 @@ function createHTMLWindow(HTMLFilePath) {
       }
     })
     win.setMenuBarVisibility(false)
-    //win.webContents.openDevTools()
+    //Uncomment DevTools for debugging
+    win.webContents.openDevTools()
     win.loadFile(HTMLFilePath)
     win.on('ready-to-show', function() { 
       win.show(); 
@@ -97,7 +98,8 @@ function createEditorWindow(HTMLFilePath, doc_path='') {
   if(doc_path) win.setTitle("Hypertext Writing Aid - "+path.basename(doc_path))
   else win.setTitle("Hypertext Writing Aid - Note Editor")
   win.loadFile(HTMLFilePath)
-  //win.webContents.openDevTools()
+  //Uncomment DevTools for debugging
+  win.webContents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowEditorList = windowEditorList.filter(w => w.id !== win.id)
@@ -138,7 +140,6 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
   win.setTitle("Hypertext Writing Aid - "+path.basename(pdfFilePath))
   //win.setMenuBarVisibility(false)
   win.loadFile('public/template.html')
-  //win.webContents.openDevTools()
   let contents = win.webContents
   win.on('ready-to-show', function() { 
     win.show(); 
@@ -148,7 +149,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
   //Uncomment DevTools for debugging
-  //contents.openDevTools()
+  contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
@@ -493,8 +494,8 @@ ipcMain.on('saveTextAsHTML-step2',(event, data) => {
 });
 
 ipcMain.on('copy-link',(eventCopy, dataCopy) => {
-    menu.getMenuItemById('copy-link').enabled = false
-    menu.getMenuItemById('paste-link').enabled = true
+  menu.getMenuItemById('copy-link').enabled = false
+  menu.getMenuItemById('paste-link').enabled = true
   ipcMain.once('paste-link', (event, data) => {
     menu.getMenuItemById('copy-link').enabled = true
     menu.getMenuItemById('paste-link').enabled = false
@@ -511,8 +512,6 @@ ipcMain.on('copy-link',(eventCopy, dataCopy) => {
       eventCopy.sender.webContents.send("copy-link",data)
     })
   })
-
-
 });
 
 ipcMain.on('send-anchor', (event, data) => {
@@ -591,7 +590,7 @@ ipcMain.on('delete-link', (event, data) => {
 
 let enquiryNewPrompt = {
   title: 'Create new enquiry',    
-  label: 'Enquriy name:',
+  label: 'Enquiry name:',
   alwaysOnTop: true, //allow the prompt window to stay over the main Window,
   type: 'input',
   width: 580, // window width
@@ -625,7 +624,7 @@ let enquiryListPrompt = {
   inputArray: [
     {
       key: 'enquiry_name',
-      label: 'Enquriy Name:',
+      label: 'Enquiry Name:',
       value: '',
       useHtmlLabel: true,
       attributes: { // Optionals attributes for input
@@ -733,7 +732,7 @@ const menuMac = Menu.buildFromTemplate([
       }
     },
     {
-      label: 'Save As',
+      label: 'Save Note As',
       accelerator: "CmdOrCtrl+Shift+s",
       id: 'save-text',
       click: function(menuItem, currentWindow) {
@@ -747,20 +746,21 @@ const menuMac = Menu.buildFromTemplate([
         }
       }
     },
-    {
-      label: 'Save PDF (without links)',
-      enabled: false,
-      id: 'save-pdf',
-      click: function(menuItem, currentWindow) {
-        if(!currentWindow) return
-        currentWindow.webContents.send("alert","Not yet implemented")
-      }
-    },
+    // {
+    //   label: 'Save PDF (without links)',
+    //   enabled: true,
+    //   id: 'save-pdf',
+    //   click: function(menuItem, currentWindow) {
+    //     //if(!currentWindow) return
+    //     currentWindow.webContents.send("save-pdf")
+    //   }
+    // },
     {
       label: 'Export Enquiry',
       enabled: true,
       id: 'export-enq',
       click: function(menuItem, currentWindow) {
+
         // Create tmp path for consoldating files
         tmpFolder = path.join(appUserPath,'tmp-enq-export')
         fs.mkdirSync(tmpFolder)
@@ -792,24 +792,28 @@ const menuMac = Menu.buildFromTemplate([
 
           // Ask user where to save
           dialog.showSaveDialog({defaultPath: '~/'+path.basename(dbFileName, '.sqlite')+'.zip'}, (newArchivePath, err) => {
-            if (err) {
-              del([outputTarget],{force:true})
-              console.log(err) 
+            if (err || !newArchivePath) {
+              // Clean up and remove temporary folder
+              del([path.join(tmpFolder+'/*')],{force:true})
+              del([path.join(tmpFolder,'/')],{force:true})
+              dialog.showMessageBox({buttons: ["OK"],message: "Export aborted."});
             } else{
               // Moves file to user specified path
               fs.rename(outputTarget, newArchivePath, function (err) {
                 if (err) {
-                  del([outputTarget],{force:true})
-                  console.log(err)
+                  // Clean up and remove temporary folder
+                  del([path.join(tmpFolder+'/*')],{force:true})
+                  del([path.join(tmpFolder,'/')],{force:true})
+                  dialog.showMessageBox({buttons: ["OK"],message: "Export failed."});
+                } else {
+                  // Clean up and remove temporary folder
+                  del([path.join(tmpFolder+'/*')],{force:true})
+                  del([path.join(tmpFolder,'/')],{force:true})
+
+                  dialog.showMessageBox({buttons: ["OK"],message: "Export finished."});
                 }
               })
             }
-
-            // Clean up and remove temporary folder
-            del([path.join(tmpFolder+'/*')],{force:true})
-            del([path.join(tmpFolder,'/')],{force:true})
-
-            dialog.showMessageBox({buttons: ["OK"],message: "Export finished."});
           })
         }).catch((err) => {console.log(err)});
       }
@@ -826,7 +830,10 @@ const menuMac = Menu.buildFromTemplate([
               { name: "ZIP", extensions: ["zip"] }
             ]
           })
-        if(!archivePath) return
+        if(!archivePath) {
+          dialog.showMessageBox({buttons: ["OK"],message: "Import aborted."});
+          return
+        }
         // Create tmp path for unpacking files
         tmpFolder = path.join(appUserPath,'tmp-enq-import')
         fs.mkdirSync(tmpFolder)
@@ -855,6 +862,14 @@ const menuMac = Menu.buildFromTemplate([
               del([dbFile],{force:true})
           })
           extractPath = dialog.showOpenDialog({ properties: ['openDirectory'] });
+          if(!extractPath) {
+            // Clean up and remove temporary folder
+            del([path.join(archivePathReal,'/*')],{force:true})
+            del([path.join(tmpFolder+'/*/')],{force:true})
+            del([path.join(tmpFolder,'/')],{force:true})
+            dialog.showMessageBox({buttons: ["OK"],message: "Import aborted."});
+            return
+          }
           console.log("extractPath: "+ extractPath)
           files = fs.readdirSync(archivePathReal);
           console.log("files: "+ files)
@@ -919,7 +934,7 @@ const menuMac = Menu.buildFromTemplate([
     label: 'View',
     submenu: [
       {
-        label: 'View Enquriy Links',
+        label: 'View Enquiry Links',
         click: function() {
           createHTMLWindow('public/link-list.html') 
         }
@@ -974,6 +989,7 @@ const menuMac = Menu.buildFromTemplate([
         enabled: true,
         id: 'copy-link',
         click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
           currentWindow.webContents.send('copy-link')
         }
       },{
@@ -982,6 +998,7 @@ const menuMac = Menu.buildFromTemplate([
         enabled: false,
         id: 'paste-link',
         click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
           currentWindow.webContents.send('paste-link')
         }
       }
@@ -1060,15 +1077,15 @@ const menuNonMac = Menu.buildFromTemplate([
         }
       }
     },
-    {
-      label: 'Save PDF (without links)',
-      enabled: false,
-      id: 'save-pdf',
-      click: function(menuItem, currentWindow) {
-        if(!currentWindow) return
-        currentWindow.webContents.send("alert","Not yet implemented")
-      }
-    },
+    // {
+    //   label: 'Save PDF (without links)',
+    //   enabled: false,
+    //   id: 'save-pdf',
+    //   click: function(menuItem, currentWindow) {
+    //     if(!currentWindow) return
+    //     currentWindow.webContents.send("alert","Not yet implemented")
+    //   }
+    // },
     {
       label: 'Export PDF (with links)',
       enabled: false,
@@ -1140,6 +1157,24 @@ const menuNonMac = Menu.buildFromTemplate([
           let data = {cancel : true}
           currentWindow.webContents.send('cancel-anchor', data) //cannot sent message directly to main
           currentWindow.webContents.send('forward-anchor', data)
+        }
+      },{
+        label: 'Copy with Link',
+        accelerator: "CmdOrCtrl+Shift+c",
+        enabled: true,
+        id: 'copy-link',
+        click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
+          currentWindow.webContents.send('copy-link')
+        }
+      },{
+        label: 'Paste with Link',
+        accelerator: "CmdOrCtrl+Shift+p",
+        enabled: false,
+        id: 'paste-link',
+        click: function(menuItem, currentWindow) {
+          if(!currentWindow) return
+          currentWindow.webContents.send('paste-link')
         }
       }
     ]
