@@ -63,7 +63,7 @@ function createHTMLWindow(HTMLFilePath) {
     })
     win.setMenuBarVisibility(false)
     //Uncomment DevTools for debugging
-    win.webContents.openDevTools()
+    //win.webContents.openDevTools()
     win.loadFile(HTMLFilePath)
     win.on('ready-to-show', function() { 
       win.show(); 
@@ -99,7 +99,7 @@ function createEditorWindow(HTMLFilePath, doc_path='') {
   else win.setTitle("Hypertext Writing Aid - Note Editor")
   win.loadFile(HTMLFilePath)
   //Uncomment DevTools for debugging
-  win.webContents.openDevTools()
+  //win.webContents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowEditorList = windowEditorList.filter(w => w.id !== win.id)
@@ -149,7 +149,7 @@ function createPDFWindow(pdfFilePath, pageNumber=1, quads, link_id) {
     contents.send('pdfFile', pdfFilePath, pageNumber, quads, link_id)
   })
   //Uncomment DevTools for debugging
-  contents.openDevTools()
+  //contents.openDevTools()
   win.on('close', () => {
     // Dereference the window object and remove from list
     windowPDFList = windowPDFList.filter(w => w.id !== win.id)
