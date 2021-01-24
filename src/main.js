@@ -1010,102 +1010,229 @@ const menuNonMac = Menu.buildFromTemplate([
   {
     label: 'File',
     submenu: [
-    {
-        label: 'Open PDF(s)',
-        accelerator: "CmdOrCtrl+o",
-        click: function() {
-          filePaths = dialog.showOpenDialog({ 
-            properties: ['openFile', 'multiSelections'],
+      {
+          label: 'Open PDF(s)',
+          accelerator: "CmdOrCtrl+o",
+          click: function() {
+            filePaths = dialog.showOpenDialog({ 
+              properties: ['openFile', 'multiSelections'],
+              filters: [
+                { name: "PDF", extensions: ["pdf"] },
+                { name: "All Files", extensions: ["*"] }
+              ]
+            })
+            if(filePaths) filePaths.forEach( (path) => { createPDFWindow(path); })
+          }
+      },
+      {
+        label: 'Open Note',
+        click: function(menuItem, currentWindow) {
+          //if(!currentWindow) return
+          //if(!windowEditorList.includes(currentWindow)) {
+          //  currentWindow.webContents.send('alert', "This works only with the text editor focused.")
+          //  return
+          //}
+          filePath = dialog.showOpenDialog({ 
+            properties: ['openFile'] ,
             filters: [
-              { name: "PDF", extensions: ["pdf"] },
+              { name: "HTML", extensions: ["html", "htm"] },
               { name: "All Files", extensions: ["*"] }
             ]
           })
-          if(filePaths) filePaths.forEach( (path) => { createPDFWindow(path); })
+          if(filePath) {
+            win = createEditorWindow('public/editor.html')
+            if(filePath[0]!="/") filePath = filePath[0]
+            win.send('loadText',filePath)  
+            win.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
+  
+            //Object.entries(documentWindowMap).forEach((filename, win) => {
+            //  if(win==currentWindow) documentWindowMap[filename]=null
+            //})
+            //documentWindowMap[path.basename(filePath[0])] = currentWindow
+            //currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
+            //currentWindow.send('loadText',filePath[0])
+          }
         }
-    },
-    {
-      label: 'Open Text',
-      click: function(menuItem, currentWindow) {
-        //if(!currentWindow) return
-        //if(!windowEditorList.includes(currentWindow)) {
-        //  currentWindow.webContents.send('alert', "This works only with the text editor focused.")
-        //  return
-        //}
-        filePath = dialog.showOpenDialog({ 
-          properties: ['openFile'] ,
-          filters: [
-            { name: "HTML", extensions: ["html", "htm"] },
-            { name: "All Files", extensions: ["*"] }
-          ]
-        })
-        if(filePath) {
-          win = createEditorWindow('public/editor.html')
+      },
+      {
+        label: 'New Note Editor',
+        accelerator: "CmdOrCtrl+n",
+        click: function() {
+          createEditorWindow('public/editor.html')          
+        }
+      },
+      {
+        label: 'Save Note As',
+        accelerator: "CmdOrCtrl+Shift+s",
+        id: 'save-text',
+        click: function(menuItem, currentWindow) {
+          if(!windowEditorList.includes(currentWindow)) return
+          let filePath = dialog.showSaveDialog() //on Windows returns a List of strings
           if(filePath[0]!="/") filePath = filePath[0]
-          win.send('loadText',filePath)  
-          win.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
-
-          //Object.entries(documentWindowMap).forEach((filename, win) => {
-          //  if(win==currentWindow) documentWindowMap[filename]=null
-          //})
-          //documentWindowMap[path.basename(filePath[0])] = currentWindow
-          //currentWindow.setTitle("Hypertext Writing Aid - "+path.basename(filePath[0]))
-          //currentWindow.send('loadText',filePath[0])
+          filePath = path.join(path.dirname(filePath),path.basename(filePath).split(".")[0])
+          if(filePath) {
+            currentWindow.send('saveTextAsHTML',filePath)
+            documentWindowMap[path.basename(filePath)] = currentWindow
+          }
+        }
+      },
+      // {
+      //   label: 'Save PDF (without links)',
+      //   enabled: true,
+      //   id: 'save-pdf',
+      //   click: function(menuItem, currentWindow) {
+      //     //if(!currentWindow) return
+      //     currentWindow.webContents.send("save-pdf")
+      //   }
+      // },
+      {
+        label: 'Export Enquiry',
+        enabled: true,
+        id: 'export-enq',
+        click: function(menuItem, currentWindow) {
+  
+          // Create tmp path for consoldating files
+          tmpFolder = path.join(appUserPath,'tmp-enq-export')
+          fs.mkdirSync(tmpFolder)
+          
+          // Get all files of an enq and copy into temp folder
+          db.getAllEnquiryDocs().then( (entries) => {
+            console.log(entries)
+            entries.forEach(entry => {
+              doc = path.join(entry.doc_path,entry.doc_name)
+              doc_copy = path.join(tmpFolder,entry.doc_name)
+              //console.log(entry,doc,doc_copy)
+              if(fs.existsSync(doc)) {
+                console.log(doc+" exist")
+                fs.copyFileSync(doc,doc_copy)
+              }
+            });
+  
+            // Archive all documents
+            outputTarget = path.join(appUserPath,dbFileName+".zip")
+            let output = fs.createWriteStream(outputTarget);
+            console.log(outputTarget)
+            let archive = archiver('zip');
+            output.on('close', () => { console.log(archive.pointer() + ' total bytes; archiver has been finalized and the output file descriptor has closed.'); });
+            archive.on('error', (err) => {console.log(err)});
+            archive.pipe(output);
+            archive.directory(tmpFolder, false);
+            archive.append(fs.createReadStream(path.join(app.getPath("userData"), dbFileName )), { name: dbFileName });
+            archive.finalize();
+  
+            // Ask user where to save
+            dialog.showSaveDialog({defaultPath: '~/'+path.basename(dbFileName, '.sqlite')+'.zip'}, (newArchivePath, err) => {
+              if (err || !newArchivePath) {
+                // Clean up and remove temporary folder
+                del([path.join(tmpFolder+'/*')],{force:true})
+                del([path.join(tmpFolder,'/')],{force:true})
+                dialog.showMessageBox({buttons: ["OK"],message: "Export aborted."});
+              } else{
+                // Moves file to user specified path
+                fs.rename(outputTarget, newArchivePath, function (err) {
+                  if (err) {
+                    // Clean up and remove temporary folder
+                    del([path.join(tmpFolder+'/*')],{force:true})
+                    del([path.join(tmpFolder,'/')],{force:true})
+                    dialog.showMessageBox({buttons: ["OK"],message: "Export failed."});
+                  } else {
+                    // Clean up and remove temporary folder
+                    del([path.join(tmpFolder+'/*')],{force:true})
+                    del([path.join(tmpFolder,'/')],{force:true})
+  
+                    dialog.showMessageBox({buttons: ["OK"],message: "Export finished."});
+                  }
+                })
+              }
+            })
+          }).catch((err) => {console.log(err)});
+        }
+      },
+      {
+        label: 'Import Enquiry',
+        enabled: true,
+        id: 'import-enq',
+        click: function(menuItem, currentWindow) {
+          // Get archive to import from user
+          archivePath = dialog.showOpenDialog({ 
+              properties: ['openFile'],
+              filters: [
+                { name: "ZIP", extensions: ["zip"] }
+              ]
+            })
+          if(!archivePath) {
+            dialog.showMessageBox({buttons: ["OK"],message: "Import aborted."});
+            return
+          }
+          // Create tmp path for unpacking files
+          tmpFolder = path.join(appUserPath,'tmp-enq-import')
+          fs.mkdirSync(tmpFolder)
+  
+          archivePath = archivePath[0]
+          console.log("extracting ",archivePath," to ",tmpFolder)
+          let zip = new AdmZip(archivePath)
+          zip.extractAllTo(tmpFolder+"/", true);
+          
+          archivePathReal = tmpFolder
+          //path.join(tmpFolder,path.parse(archivePath).name+"/");
+          
+          //get sqlite path
+          let files = fs.readdirSync(archivePathReal);
+  
+            sqliteFileName = files.filter( function(file){
+              return file.includes("sqlite")
+            })[0]
+            
+            console.log(sqliteFileName)
+            let dbFile = path.join(archivePathReal,sqliteFileName)
+           
+            // Moves database to appUserPath
+            let newDbPath = path.join(appUserPath, path.parse(archivePath).name+".sqlite")
+            fs.rename(dbFile, newDbPath, function (err) {
+              if (err) console.log(err)
+                del([dbFile],{force:true})
+            })
+            extractPath = dialog.showOpenDialog({ properties: ['openDirectory'] });
+            if(!extractPath) {
+              // Clean up and remove temporary folder
+              del([path.join(archivePathReal,'/*')],{force:true})
+              del([path.join(tmpFolder+'/*/')],{force:true})
+              del([path.join(tmpFolder,'/')],{force:true})
+              dialog.showMessageBox({buttons: ["OK"],message: "Import aborted."});
+              return
+            }
+            console.log("extractPath: "+ extractPath)
+            files = fs.readdirSync(archivePathReal);
+            console.log("files: "+ files)
+            files.forEach( file => {
+              console.log("file in foreach: "+file)
+              fs.rename(path.join(archivePathReal,file), path.join(""+extractPath,file), function (err) {
+                if (err) { console.log(err) }
+                else {
+                  db.updatePathsAfterImport(""+extractPath,newDbPath) 
+                }
+              })
+            })
+  
+            // Clean up and remove temporary folder
+            del([path.join(archivePathReal,'/*')],{force:true})
+            del([path.join(tmpFolder+'/*/')],{force:true})
+            del([path.join(tmpFolder,'/')],{force:true})
+  
+            dialog.showMessageBox({buttons: ["OK"],message: "Import finished."});
+        }
+      },
+      {
+        label: 'Close All',
+        accelerator: "CmdOrCtrl+q",
+        click: function() {
+          db.deleteTemporaryLinks()
+          db.closeDatabase()
+          global.sharedObj.database = null
+          app.quit()
         }
       }
-    },
-    {
-      label: 'New Note Editor',
-      accelerator: "CmdOrCtrl+n",
-      click: function() {
-        createEditorWindow('public/editor.html')          
-      }
-    },
-    {
-      label: 'Save Note As',
-      accelerator: "CmdOrCtrl+Shift+s",
-      id: 'save-text',
-      click: function(menuItem, currentWindow) {
-        if(!currentWindow) return
-        if(!windowEditorList.includes(currentWindow)) return
-        let filePath = dialog.showSaveDialog() //on Windows returns a List of strings
-        if(filePath[0]!="/") filePath = filePath[0]
-        filePath = path.join(path.dirname(filePath),path.basename(filePath).split(".")[0])
-        if(filePath) {
-          currentWindow.send('saveTextAsHTML',filePath)
-          documentWindowMap[path.basename(filePath)] = currentWindow
-        }
-      }
-    },
-    // {
-    //   label: 'Save PDF (without links)',
-    //   enabled: false,
-    //   id: 'save-pdf',
-    //   click: function(menuItem, currentWindow) {
-    //     if(!currentWindow) return
-    //     currentWindow.webContents.send("alert","Not yet implemented")
-    //   }
-    // },
-    {
-      label: 'Export PDF (with links)',
-      enabled: false,
-      id: 'export-pdf',
-      click: function(menuItem, currentWindow) {
-        if(!currentWindow) return
-        currentWindow.webContents.send("alert","Not yet implemented")
-      }
-    },
-    {
-      label: 'Close All',
-      accelerator: "CmdOrCtrl+q",
-      click: function() {
-        db.deleteTemporaryLinks()
-        db.closeDatabase()
-        global.sharedObj.database = null
-        app.quit()
-      }
-    }
-  ]}, {
+    ]}, {
     label: 'View',
     submenu: [
       {
